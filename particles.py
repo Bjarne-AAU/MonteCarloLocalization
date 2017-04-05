@@ -20,13 +20,6 @@ class Particles(AbstractParticles):
 
     def __init__(self, N, map):
         self.N = N
-<<<<<<< HEAD
-        width = map.width
-        height = map.height
-        self._particles = np.hstack((np.random.randint(0, width, (N,1)), np.random.randint(0, height, (N,1))))
-
-    def sample(self):  #implement non-stratified sampling
-=======
         self.width = map.width
         self.height = map.height
         self._particles = np.zeros((N, 3))
@@ -36,7 +29,6 @@ class Particles(AbstractParticles):
 
     def resample(self):  #implement stratified sampling
         # numpy.random.choice(N, N, p=w, replace=True)
->>>>>>> 76f34fc82c487eff330ddc8058b5e16169f7f121
         sampled_particles = np.zeros(self._particles.shape)  #empty array
         draws = np.random.uniform(low=0.0, high=1.0, size=self.N)
         cdf = np.cumsum(self.weights)
