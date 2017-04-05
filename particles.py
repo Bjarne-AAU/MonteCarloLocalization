@@ -20,11 +20,23 @@ class Particles(AbstractParticles):
 
     def __init__(self, N, map):
         self.N = N
+<<<<<<< HEAD
         width = map.width
         height = map.height
         self._particles = np.hstack((np.random.randint(0, width, (N,1)), np.random.randint(0, height, (N,1))))
 
     def sample(self):  #implement non-stratified sampling
+=======
+        self.width = map.width
+        self.height = map.height
+        self._particles = np.zeros((N, 3))
+        self._particles[:,0] = np.random.randint(0, self.width, N)
+        self._particles[:,1] = np.random.randint(0, self.height, N)
+        self._particles[:,2] = 1
+
+    def resample(self):  #implement stratified sampling
+        # numpy.random.choice(N, N, p=w, replace=True)
+>>>>>>> 76f34fc82c487eff330ddc8058b5e16169f7f121
         sampled_particles = np.zeros(self._particles.shape)  #empty array
         draws = np.random.uniform(low=0.0, high=1.0, size=self.N)
         cdf = np.cumsum(self.weights)
@@ -57,6 +69,10 @@ class Particles(AbstractParticles):
     def weights(self):
         return self._particles[:,2]
 
+    @weights.setter
+    def weights(self, weights):
+        self._particles[:,2] = weights
+
     @property
     def positions(self):
         return self._particles[:,0:2]
@@ -64,6 +80,16 @@ class Particles(AbstractParticles):
     @positions.setter
     def positions(self, positions):
         self._particles[:,0:2] = positions
+        self._particles[:,0] = np.remainder(self._particles[:,0], self.width)
+        self._particles[:,1] = np.remainder(self._particles[:,1], self.height)
 
     def at(self, index):
         return self._particles[index,:]
+
+    @property
+    def effectiveN(self):
+        sumsq = np.sum(self.weights)
+        sumsq *= sumsq
+        sqsum = self.weights * self.weights
+        sqsum = np.sum(sqsum)
+        return sumsq / sqsum
