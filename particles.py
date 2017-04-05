@@ -24,7 +24,7 @@ class Particles(AbstractParticles):
         height = map.height
         self._particles = np.hstack((np.random.randint(0, width, (N,1)), np.random.randint(0, height, (N,1))))
 
-    def sample(self):  #implement stratified sampling
+    def sample(self):  #implement non-stratified sampling
         sampled_particles = np.zeros(self._particles.shape)  #empty array
         draws = np.random.uniform(low=0.0, high=1.0, size=self.N)
         cdf = np.cumsum(self.weights)
@@ -35,6 +35,23 @@ class Particles(AbstractParticles):
                 j += 1
             sampled_particles[i] = self._particles[j]
         self._particles = sampled_particles
+
+    def sample_stratified(self): #implement stratified sampling
+        N = len(self.weights)
+        # make N subdivisions, and choose a random position within each one
+        positions = (random(N) + range(N)) / N
+        sampled_particles = np.zeros(self._particles.shape)  #empty array store resampling
+        cdf = np.cumsum(self.weights)
+        cdf = cdf/cdf[-1] #normalizing cdf
+        i, j = 0, 0
+        while i < N:
+            if positions[i] < cdf[j]:
+                sampled_particles[i] = j
+                i += 1
+            else:
+                j += 1
+        self._particles = sampled_particles
+
 
     @property
     def weights(self):
