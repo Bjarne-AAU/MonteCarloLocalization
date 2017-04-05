@@ -20,14 +20,15 @@ class Particles(AbstractParticles):
 
     def __init__(self, N, map):
         self.N = N
-        width = map.width
-        height = map.height
+        self.width = map.width
+        self.height = map.height
         self._particles = np.zeros((N, 3))
-        self._particles[:,0] = np.random.randint(0, width, N)
-        self._particles[:,1] = np.random.randint(0, height, N)
+        self._particles[:,0] = np.random.randint(0, self.width, N)
+        self._particles[:,1] = np.random.randint(0, self.height, N)
         self._particles[:,2] = 1
 
     def resample(self):  #implement stratified sampling
+        # numpy.random.choice(N, N, p=w, replace=True)
         sampled_particles = np.zeros(self._particles.shape)  #empty array
         draws = np.random.uniform(low=0.0, high=1.0, size=self.N)
         cdf = np.cumsum(self.weights)
@@ -50,6 +51,8 @@ class Particles(AbstractParticles):
     @positions.setter
     def positions(self, positions):
         self._particles[:,0:2] = positions
+        self._particles[:,0] = np.remainder(self._particles[:,0], self.width)
+        self._particles[:,1] = np.remainder(self._particles[:,1], self.height)
 
     def at(self, index):
         return self._particles[index,:]
