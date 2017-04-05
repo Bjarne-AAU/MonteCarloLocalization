@@ -159,7 +159,7 @@ while win.running:
     view_m = pygame.surfarray.pixels2d(view)
     randn = np.random.normal(0, 0.1, view.get_size())*255
     randn = gaussian_filter(randn, sigma=5, mode="wrap")
-    view_m -= randn
+    view_m -= randn.astype(np.uint8)
     del view_m
 
     minimap.blit(view, (0, 0))
