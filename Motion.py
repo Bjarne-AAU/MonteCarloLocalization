@@ -12,7 +12,7 @@ class MotionModel(object):
 
         def noiseFun(pos):
             # print(pos)
-            n = np.random.normal(scale=5, size=2)
+            n = np.random.normal(scale=2, size=2)
             return pos + vel + n
 
         particles.positions = np.apply_along_axis(noiseFun, 1, particles.positions)

@@ -1,6 +1,7 @@
 import sys
 import pygame
 pygame.init()
+import ObservationParticles as wp
 
 
 from scipy import interpolate
@@ -24,6 +25,8 @@ from World import create_palette
 from Robot import Robot
 
 from Observation import ObservationModel
+from Motion import MotionModel
+from particles import *
 
 np.set_printoptions(suppress=True)
 np.set_printoptions(linewidth=150)
@@ -47,7 +50,11 @@ robot_pos_x = map_width/2
 robot_pos_y = map_height/2
 robot_image = "gui/rocket.png"
 
-old_pos = np.array( (robot_pos_x, robot_pos_y) )
+N_particles = 500
+sample_threshold = N_particles*0.40
+
+#old_pos = np.array( (robot_state, robot_pos_y) )
+robot_state = np.array([robot_pos_x, robot_pos_y, 0])
 
 win = MainWindow(win_width, win_height, "Monte Carlo Localization - Demo application")
 win.FPS = 30
@@ -81,14 +88,14 @@ while win.running:
             print("Generate {} with seed {}".format(win.get_option("world"), seed))
             world = WorldMap(map_width, map_height, pad_x=40, pad_y=40, scale=8, colors=world_type, type=NOISE.SIMPLEX, seed=seed)
             robot = Robot(robot_pos_x, robot_pos_y, 0, robot_width, robot_height, robot_image)
-
+            particles = Particles(N_particles,world)
 
     mainmap = win.get_mainmap_canvas()
     mainmap.blit(world.map(), (0, 0))
 
 
     robot.update(dt)
-    robot_motion = robot.pos - old_pos
+    robot_motion = robot.state - robot_state
     robot.x = robot.x % world.width
     robot.y = robot.y % world.height
     robot.angle = robot.angle % 360
@@ -97,43 +104,74 @@ while win.running:
     MAP = None
 
     if win.get_option("reset"):
+        particles = Particles(N_particles,world)
         posterior_m = None
         like_m = None
         win.reset_option("reset")
 
 
     if win.get_option("start") or win.get_option("step"):
+        particles = MotionModel.evaluate(robot_motion, particles)
+        if not win.get_option("particle_posterior"):
+            like_m = ObservationModel.evaluate(robot, world)
+            if posterior_m is None: posterior_m = np.ones(like_m.shape, dtype=np.float)
 
-        like_m = ObservationModel.evaluate(robot, world)
-        if posterior_m is None: posterior_m = np.ones(like_m.shape, dtype=np.float)
+            kx = int(dt * np.sqrt(robot_motion[1] * robot_motion[1]) * 15.0) * 2 + 3
+            ky = int(dt * np.sqrt(robot_motion[0] * robot_motion[0]) * 15.0) * 2 + 3
+            posterior_m = cv2.GaussianBlur(posterior_m, (kx, ky), cv2.BORDER_WRAP)
 
-        kx = int(dt * np.sqrt(robot_motion[1] * robot_motion[1]) * 15.0) * 2 + 3
-        ky = int(dt * np.sqrt(robot_motion[0] * robot_motion[0]) * 15.0) * 2 + 3
-        posterior_m = cv2.GaussianBlur(posterior_m, (kx, ky), cv2.BORDER_WRAP)
+            posterior_m = np.roll(posterior_m, int(round(robot_motion[0])), 0)
+            posterior_m = np.roll(posterior_m, int(round(robot_motion[1])), 1)
 
-        posterior_m = np.roll(posterior_m, int(round(robot_motion[0])), 0)
-        posterior_m = np.roll(posterior_m, int(round(robot_motion[1])), 1)
+            MLE = np.unravel_index(like_m.argmax(), like_m.shape)
+            posterior_m *= like_m
+            #posterior_m = np.exp(posterior_m - np.max(posterior_m))
+            posterior_m = posterior_m/np.max(posterior_m)
 
-        MLE = np.unravel_index(like_m.argmax(), like_m.shape)
-        posterior_m *= like_m
-        posterior_m = posterior_m/np.max(posterior_m)
+            MAP = np.unravel_index(posterior_m.argmax(), posterior_m.shape)
+            if like_m is not None and win.get_option("show_likelihood"):
+                like = pygame.surfarray.make_surface((like_m * 240 + 15))
+                like.set_palette(create_palette(cm.gray))
+                mainmap.blit(like, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
 
-        MAP = np.unravel_index(posterior_m.argmax(), posterior_m.shape)
+            if posterior_m is not None and win.get_option("show_posterior"):
+                posterior = pygame.surfarray.make_surface((posterior_m * 240 + 15))
+                posterior.set_palette(create_palette(cm.gray))
+                mainmap.blit(posterior, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
 
-        old_pos = robot.pos
+        else:
+            like_m = wp.evaluate_particles_weights(robot, particles,world)
+
+            if posterior_m is None: posterior_m = np.ones(like_m.shape, dtype=np.float)
+
+            posterior_m *= like_m
+            posterior_m += 0.01
+
+            posterior_m = posterior_m/np.max(posterior_m)
+            particles.weights = posterior_m
+            index = posterior_m.argmax()
+            MAP = (particles.at(index)[0:2] + np.array([robot.width/2, robot.height/2])).astype(np.int)
+            if particles.effectiveN < sample_threshold:
+                particles.resample()
+
+        robot_state = robot.state
         win.reset_option("step")
 
 
 
-    if like_m is not None and win.get_option("show_likelihood"):
-        like = pygame.surfarray.make_surface((like_m * 240 + 15))
-        like.set_palette(create_palette(cm.gray))
-        mainmap.blit(like, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
 
-    if posterior_m is not None and win.get_option("show_posterior"):
-        posterior = pygame.surfarray.make_surface((posterior_m * 240 + 15))
-        posterior.set_palette(create_palette(cm.gray))
-        mainmap.blit(posterior, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+
+    if posterior_m is not None and win.get_option("draw_particle"):
+       # print particles.positions.shape
+        for n in range(particles.N):
+            particle_x = particles.at(n)[0] + robot.width/2
+            particle_y = particles.at(n)[1] + robot.height/2
+            pygame.draw.circle(mainmap, (255,0,0), np.round(np.array([particle_x,particle_y])).astype(np.int), 
+                np.round(posterior_m[n]*10).astype(np.int))
+
+
+        
+
 
     if MLE is not None:
         pygame.draw.circle(mainmap, (255,0,0), MLE, 5, 2)

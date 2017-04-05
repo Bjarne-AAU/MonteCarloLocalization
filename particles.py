@@ -43,7 +43,7 @@ class Particles(AbstractParticles):
     def sample_stratified(self): #implement stratified sampling
         N = len(self.weights)
         # make N subdivisions, and choose a random position within each one
-        positions = (random(N) + range(N)) / N
+        positions = (np.random.random(N) + np.arange(N)) / N
         sampled_particles = np.zeros(self._particles.shape)  #empty array store resampling
         cdf = np.cumsum(self.weights)
         cdf = cdf/cdf[-1] #normalizing cdf
