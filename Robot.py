@@ -19,6 +19,10 @@ class Robot(object):
         self._alpha = 255
 
     @property
+    def state(self):
+        return np.array([self.x, self.y, self.angle])
+
+    @property
     def pos(self):
         return np.array([self.x, self.y])
 
