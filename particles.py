@@ -44,6 +44,10 @@ class Particles(AbstractParticles):
     def weights(self):
         return self._particles[:,2]
 
+    @weights.setter
+    def weights(self, weights):
+        self._particles[:,2] = weights
+
     @property
     def positions(self):
         return self._particles[:,0:2]
