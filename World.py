@@ -248,5 +248,7 @@ class WorldMap(object):
             gaussian_filter(view_m, sigma=(scale_x/3.0, scale_y/3.0), output=view_m)
             del view_m
 
-
         return submap
+
+    def draw(self, image):
+        image.blit(self.map(), (0, 0))

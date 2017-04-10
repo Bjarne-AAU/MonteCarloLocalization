@@ -1,7 +1,6 @@
 import sys
 import pygame
 pygame.init()
-import ObservationParticles as wp
 
 
 from scipy import interpolate
@@ -24,7 +23,12 @@ from World import create_palette
 
 from Robot import Robot
 
+from Observation import VisionSensor
+from Observation import VisionSensorNoiseModel
 from Observation import ObservationModel
+
+from Motion import MotionSensor
+from Motion import MotionSensorNoiseModel
 from Motion import MotionModel
 from particles import *
 
@@ -41,7 +45,7 @@ def to_int(text):
 win_width = 1000
 win_height = 600
 
-map_seed = np.random.randint(10000)
+map_seed = np.random.randint(1000)
 map_width = win_width-200
 map_height = win_height
 robot_width = 20
@@ -59,6 +63,10 @@ robot_state = np.array([robot_pos_x, robot_pos_y, 0])
 win = MainWindow(win_width, win_height, "Monte Carlo Localization - Demo application")
 win.FPS = 30
 win.set_option("seed", map_seed)
+
+
+vision_sensor = VisionSensor((robot_width, robot_height))
+motion_sensor = MotionSensor(robot_state)
 
 
 like_m = None
@@ -90,15 +98,17 @@ while win.running:
             robot = Robot(robot_pos_x, robot_pos_y, 0, robot_width, robot_height, robot_image)
             particles = Particles(N_particles,world)
 
-    mainmap = win.get_mainmap_canvas()
-    mainmap.blit(world.map(), (0, 0))
 
+    mainmap = win.get_mainmap_canvas()
+    world.draw(mainmap)
 
     robot.update(dt)
+    motion_sensor.observe(robot.state)
+    motion_sensor.add_noise(MotionSensorNoiseModel.GAUSSIAN, 0.5)
+    # motion_sensor.draw(mainmap)
+
+
     robot_motion = robot.state - robot_state
-    robot.x = robot.x % world.width
-    robot.y = robot.y % world.height
-    robot.angle = robot.angle % 360
 
     MLE = None
     MAP = None
@@ -113,7 +123,7 @@ while win.running:
     if win.get_option("start") or win.get_option("step"):
         particles = MotionModel.evaluate(robot_motion, particles)
         if not win.get_option("particle_posterior"):
-            like_m = ObservationModel.evaluate(robot, world)
+            like_m = ObservationModel.MDIFF.evaluate(vision_sensor.observation, world)
             if posterior_m is None: posterior_m = np.ones(like_m.shape, dtype=np.float)
 
             kx = int(dt * np.sqrt(robot_motion[1] * robot_motion[1]) * 15.0) * 2 + 3
@@ -140,7 +150,7 @@ while win.running:
                 mainmap.blit(posterior, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
 
         else:
-            like_m = wp.evaluate_particles_weights(robot, particles,world)
+            like_m = ObservationModel.MDIFF.evaluate(vision_sensor.observation, world, particles.positions)
 
             if posterior_m is None: posterior_m = np.ones(like_m.shape, dtype=np.float)
 
@@ -150,9 +160,10 @@ while win.running:
             posterior_m = posterior_m/np.max(posterior_m)
             particles.weights = posterior_m
             index = posterior_m.argmax()
-            MAP = (particles.at(index)[0:2] + np.array([robot.width/2, robot.height/2])).astype(np.int)
+            MAP = (particles.at(index)[0:2]).astype(np.int)
             if particles.effectiveN < sample_threshold:
                 particles.resample()
+                # posterior_m[:] = 1.0
 
         robot_state = robot.state
         win.reset_option("step")
@@ -164,13 +175,13 @@ while win.running:
     if posterior_m is not None and win.get_option("draw_particle"):
        # print particles.positions.shape
         for n in range(particles.N):
-            particle_x = particles.at(n)[0] + robot.width/2
-            particle_y = particles.at(n)[1] + robot.height/2
-            pygame.draw.circle(mainmap, (255,0,0), np.round(np.array([particle_x,particle_y])).astype(np.int), 
+            particle_x = particles.at(n)[0]
+            particle_y = particles.at(n)[1]
+            pygame.draw.circle(mainmap, (255,0,0), np.round(np.array([particle_x,particle_y])).astype(np.int),
                 np.round(posterior_m[n]*10).astype(np.int))
 
 
-        
+
 
 
     if MLE is not None:
@@ -181,33 +192,23 @@ while win.running:
 
 
     if not win.get_option("hide_robot"):
+        robot.scale = 1.0
         robot.set_color(255, 80, 80, 255)
+        robot.draw(mainmap)
 
-        dimg = robot.image
-        d, r = divmod(robot.pos + robot.size, world.size)
-        if d[0] > 0.0 and r[0] > 0.0: mainmap.blit(dimg, [r[0]-robot.width, robot.y])
-        if d[1] > 0.0 and r[1] > 0.0: mainmap.blit(dimg, [robot.x, r[1]-robot.height])
-        if d[0] > 0.0 and d[1] > 0.0 and r[0] > 0.0 and r[1] > 0.0: mainmap.blit(dimg, [r[0]-robot.width, r[1]-robot.height])
-        mainmap.blit(dimg, robot.pos)
 
+    vision_sensor.observe(robot.pos, world)
+    # vision_sensor.add_noise(VisionSensorNoiseModel.SALT_PEPPER, 0.6)
+    vision_sensor.add_noise(VisionSensorNoiseModel.SPECKLE, 0.7)
+    # vision_sensor.add_noise(VisionSensorNoiseModel.GAUSSIAN, 0.5)
 
     minimap = win.get_minimap_canvas()
-    view = world.map(list(robot.pos) + list(robot.size), minimap.get_size())
 
-    view_m = pygame.surfarray.pixels2d(view)
-    randn = np.random.normal(0, 0.1, view.get_size())*255
-    randn = gaussian_filter(randn, sigma=5, mode="wrap")
-    view_m -= randn.astype(np.uint8)
-    del view_m
-
-    minimap.blit(view, (0, 0))
-
+    vision_sensor.draw(minimap)
 
     robot.scale = 5.0
     robot.set_color(0,0,0,80)
-    center = np.array(minimap.get_rect().center)
-    minimap.blit(robot.image, center - robot.size/2.0)
-    robot.scale = 1.0
+    robot.draw(minimap, minimap.get_rect().center)
 
 
 

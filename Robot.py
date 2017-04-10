@@ -65,6 +65,11 @@ class Robot(object):
         image.fill(self.color, special_flags=pygame.BLEND_RGBA_MULT)
         return pygame.transform.smoothscale(image, self.size)
 
+    def draw(self, image, pos=None):
+        if pos is None: pos = np.mod(self.pos, image.get_size())
+        pos -= self.size/2
+        image.blit(self.image, pos)
+
     def accelerate(self, vx, dt):
         self._v += vx * dt
 

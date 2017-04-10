@@ -39,6 +39,7 @@ class Particles(AbstractParticles):
                 j += 1
             sampled_particles[i] = self._particles[j]
         self._particles = sampled_particles
+        self._particles[:,2] = 1
 
     def sample_stratified(self): #implement stratified sampling
         N = len(self.weights)
