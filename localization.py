@@ -1,5 +1,24 @@
 import sys
+
+import numpy as np
+import scipy
+import matplotlib
+
 import pygame
+import noise
+import cv2
+
+print("Version check")
+print("=============")
+print("python    : {}".format(sys.version.split(' ')[0]))
+print("numpy     : {}".format(np.__version__))
+print("scipy     : {}".format(scipy.__version__))
+print("matplotlib: {}".format(matplotlib.__version__))
+print("pygame    : {}".format(pygame.__version__))
+print("noise     : {}".format(noise.__version__))
+print("cv2       : {}".format(cv2.__version__))
+print("=============")
+
 pygame.init()
 
 
@@ -7,8 +26,6 @@ from scipy import interpolate
 from scipy.ndimage.filters import gaussian_filter
 from scipy.ndimage.filters import convolve
 from scipy.ndimage.filters import generic_filter
-import numpy as np
-import cv2
 
 from gui.window import MainWindow
 
@@ -30,6 +47,8 @@ from Observation import ObservationModel
 from Motion import MotionSensor
 from Motion import MotionSensorNoiseModel
 from Motion import MotionModel
+from Motion import Motion
+
 from particles import *
 
 np.set_printoptions(suppress=True)
@@ -65,8 +84,13 @@ win.FPS = 30
 win.set_option("seed", map_seed)
 
 
-vision_sensor = VisionSensor((robot_width, robot_height))
+vision_sensor = VisionSensor((robot_width*2, robot_height*2))
 motion_sensor = MotionSensor(robot_state)
+
+
+
+
+
 
 
 like_m = None
@@ -126,12 +150,21 @@ while win.running:
             like_m = ObservationModel.MDIFF.evaluate(vision_sensor.observation, world)
             if posterior_m is None: posterior_m = np.ones(like_m.shape, dtype=np.float)
 
-            kx = int(dt * np.sqrt(robot_motion[1] * robot_motion[1]) * 15.0) * 2 + 3
-            ky = int(dt * np.sqrt(robot_motion[0] * robot_motion[0]) * 15.0) * 2 + 3
-            posterior_m = cv2.GaussianBlur(posterior_m, (kx, ky), cv2.BORDER_WRAP)
+            # kx = int(dt * np.sqrt(robot_motion[1] * robot_motion[1]) * 15.0) * 2 + 3
+            # ky = int(dt * np.sqrt(robot_motion[0] * robot_motion[0]) * 15.0) * 2 + 3
+            # posterior_m = cv2.GaussianBlur(posterior_m, (kx, ky), cv2.BORDER_WRAP)
 
-            posterior_m = np.roll(posterior_m, int(round(robot_motion[0])), 0)
-            posterior_m = np.roll(posterior_m, int(round(robot_motion[1])), 1)
+            # posterior_m = np.roll(posterior_m, int(round(robot_motion[0])), 0)
+            # posterior_m = np.roll(posterior_m, int(round(robot_motion[1])), 1)
+
+            kernel = Motion.kernel(posterior_m, robot_motion, MotionSensorNoiseModel.GAUSSIAN)
+            kern = pygame.surfarray.make_surface((kernel * 255))
+            kern.set_palette(create_palette(cm.gray))
+            mainmap.blit(kern, (800-kernel.shape[0], 600-kernel.shape[1]))
+
+
+            posterior_m = Motion.propagate_density(posterior_m, robot_motion, MotionSensorNoiseModel.GAUSSIAN)
+            # posterior_m += 0.0001
 
             MLE = np.unravel_index(like_m.argmax(), like_m.shape)
             posterior_m *= like_m
@@ -199,8 +232,8 @@ while win.running:
 
     vision_sensor.observe(robot.pos, world)
     # vision_sensor.add_noise(VisionSensorNoiseModel.SALT_PEPPER, 0.6)
-    vision_sensor.add_noise(VisionSensorNoiseModel.SPECKLE, 0.7)
-    # vision_sensor.add_noise(VisionSensorNoiseModel.GAUSSIAN, 0.5)
+    # vision_sensor.add_noise(VisionSensorNoiseModel.SPECKLE, 0.7)
+    vision_sensor.add_noise(VisionSensorNoiseModel.GAUSSIAN, 0.5)
 
     minimap = win.get_minimap_canvas()
 

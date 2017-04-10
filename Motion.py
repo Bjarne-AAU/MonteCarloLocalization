@@ -1,7 +1,11 @@
 
-import pygame
 import numpy as np
-import scipy.stats as stats
+import cv2
+import pygame
+
+from scipy import linalg
+from scipy import stats
+
 
 class MotionSensor(object):
 
@@ -40,50 +44,59 @@ class MotionSensorNoise(object):
 class MotionSensorNoiseGaussian(MotionSensorNoise):
 
     @staticmethod
-    def add(motion, level_pos, level_rot):
-        # by distance and rotation
-        sigma_pos = level_pos
-        noise_pos = stats.norm.rvs(0, sigma_pos, 2)
-        sigma_rot = level_rot
-        noise_rot = stats.norm.rvs(0, sigma_rot, 1)
-        motion += np.hstack( (noise_pos, noise_rot) )
+    def add(motion, level_dist, level_rot):
+        dist = linalg.norm(motion[0:2])
+        motion[0:2] *= stats.norm.rvs(1, level_dist)
+        motion[2] += stats.norm.rvs(0, level_rot)
 
     @staticmethod
-    def prob(motion, motion_ref, level_pos, level_rot):
-        # by distance and rotation
-        diff = (motion - motion_ref).T
-        sigma_pos = level_pos
-        prob = stats.norm.pdf(diff[0,], 0, sigma_pos)
-        sigma_rot = level_rot
-        noise_rot = stats.norm.pdf(diff[2,], 0, sigma_rot)
+    def prob(motions, motion_ref, level_dist, level_rot):
+        vec = motion_ref[0:2]
+        vecs = motions.T[0:2,]
+        mag = linalg.norm(vec)
+        mags = linalg.norm(vecs, axis=0)
+
+        sigma = max(mag, 0.5)*level_dist/5.0
+        probs = stats.norm.pdf(mags, mag, sigma)
+
+        norm = mags * mag
+        indices = norm.nonzero()[0]
+        angles = np.ones(len(motions))
+        angles[indices] = vec.dot(vecs[:,indices]) / norm[indices]
+        # probs = probs * stats.norm.pdf(angles, 1, level_rot*level_rot/2.0)
+
+        return probs/np.max(probs)
+
+        # only positional data is considered
+        # rot = motions.T[2,] - motion_ref[2]
+        # rot_p = stats.norm.pdf(rot, 1, level_rot)
 
 
 class MotionSensorNoiseModel(object):
     GAUSSIAN  = MotionSensorNoiseGaussian
 
 
-
-
-
-
 class Motion(object):
 
+
     @classmethod
-    def propagate(cls, motion, locations=None):
-        pos = -np.array(observation.get_size())/2
-        size = world.size + observation.get_size() - 1
-        model = world.map(np.concatenate((pos, size)))
-        model_m = pygame.surfarray.pixels2d(model)
-        observation_m = pygame.surfarray.pixels2d(observation)
-        if locations is None:
-            res = cls.evaluate_global(model_m, observation_m)
-        else:
-            res = cls.evaluate_local(locations, model_m, observation_m)
-        min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
-        if (max_val > min_val):
-            res = (res-min_val)/(max_val-min_val)
-        else: res = res/max_val
-        return res
+    def kernel(cls, density, motion, noisemodel):
+        kernel_size = 49
+        motions = -np.vstack(np.mgrid[-kernel_size/2:kernel_size/2+1, -kernel_size/2:kernel_size/2+1].T) + motion[0:2]
+        kernel = noisemodel.prob(motions, motion, 2.0, 0.6).reshape((kernel_size+1, kernel_size+1)).T
+        return kernel
+
+    @classmethod
+    def propagate_density(cls, density, motion, noisemodel):
+
+        kernel_size = 49
+        motions = -np.vstack(np.mgrid[-kernel_size/2:kernel_size/2+1, -kernel_size/2:kernel_size/2+1].T) + motion[0:2]
+        kernel = noisemodel.prob(motions, motion, 2.0, 0.6).reshape((kernel_size+1, kernel_size+1)).T
+
+        density = cv2.filter2D(density, -1, kernel, borderType=cv2.BORDER_WRAP)
+        density = np.roll(density, motion[0:2].astype(np.int), axis=(0,1))
+
+        return density
 
     @classmethod
     def propagate_global(cls, world, observation):

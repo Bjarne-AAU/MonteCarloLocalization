@@ -1,18 +1,9 @@
 
-import pygame
 import numpy as np
-import scipy.stats as stats
-
-from scipy.ndimage.filters import gaussian_filter
-
+import pygame
 import cv2
 
-from matplotlib import cm
-
-from World import WORLD_TYPE
-from World import world_type_from_colormap
-from World import create_palette
-
+import scipy.stats as stats
 
 
 class VisionSensor(object):
@@ -48,13 +39,9 @@ class VisionSensor(object):
 class VisionSensorNoise(object):
 
     @staticmethod
-    def distribution(x):
-        res = stats.cauchy.pdf(x, 90, 100)
-        return res
-
-    @staticmethod
-    def weights(x):
-        return VisionSensorNoise.distribution(x) / VisionSensorNoise.distribution(0)
+    def prior(x):
+        d = stats.cauchy(90, 100)
+        return d.pdf(x) / d.pdf(0)
 
     @staticmethod
     def add(mat, level):
@@ -65,8 +52,8 @@ class VisionSensorNoiseGaussian(VisionSensorNoise):
 
     @staticmethod
     def add(mat, level):
-        weights = VisionSensorNoise.weights(mat)
-        sigma = weights * level * level * 127
+        prior = VisionSensorNoise.prior(mat)
+        sigma = prior * level * level * 127
         noise = np.random.normal(0, sigma, mat.shape)
         res = mat + noise
         res = cv2.GaussianBlur(res, (5,5), 2)
@@ -77,8 +64,7 @@ class VisionSensorNoiseSaltPepper(VisionSensorNoise):
 
     @staticmethod
     def add(mat, level):
-        weights = VisionSensorNoise.weights(mat)
-        probs = weights
+        probs = VisionSensorNoise.prior(mat)
         probs /= np.sum(probs)
         N = mat.size * level * level * 0.25
 
@@ -94,8 +80,8 @@ class VisionSensorNoiseSpeckle(VisionSensorNoise):
 
     @staticmethod
     def add(mat, level):
-        weights = VisionSensorNoise.weights(mat)
-        sigma = weights * level * level * 2
+        prior = VisionSensorNoise.prior(mat)
+        sigma = prior * level * level * 2
         noise = np.random.normal(0, sigma, mat.shape)
         res = mat + noise * 100 #(135.0 - np.abs(mat-120.0))
         res = cv2.GaussianBlur(res, (5,5), 2)
