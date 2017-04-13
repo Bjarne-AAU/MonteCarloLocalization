@@ -1,5 +1,6 @@
 import pygame
 import numpy as np
+import time
 
 class Robot(object):
 

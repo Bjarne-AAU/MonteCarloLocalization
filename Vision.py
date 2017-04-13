@@ -3,95 +3,104 @@ import numpy as np
 import pygame
 import cv2
 
-import scipy.stats as stats
+from scipy import linalg
+from scipy import stats
 
+from Tools import as_int
 
-class VisionSensor(object):
+from Sensor import Sensor as AbstractSensor
+from Sensor import SensorNoise as AbstractSensorNoise
 
-    def __init__(self, size):
+class Sensor(AbstractSensor):
+
+    def __init__(self, size, fps=None):
+        super(Sensor, self).__init__(fps)
         self._size = np.array(size)
-        self._image = pygame.Surface(size, 0, 8)
 
-    @property
-    def size(self):
-        return self._size
+    def _observe(self, what):
+        location, world = what
+        location %= world.size
+        image = world.map(np.concatenate((location - self._size/2, self._size)))
+        return image.copy()
 
-    @property
-    def observation(self):
-        return self._image
-
-    def observe(self, location, world):
-        location = np.mod(location, world.size)
-        img = world.map(np.concatenate((location - self._size/2, self._size)))
-        self._image.set_palette(img.get_palette())
-        self._image.blit(img, (0,0))
-
-    def add_noise(self, noisemodel, level=0.5):
-        mat = pygame.surfarray.pixels2d(self._image)
-        noisemodel.add(mat, level)
-
-    def draw(self, image):
-        view = pygame.transform.scale(self._image, image.get_size())
+    def _draw(self, image):
+        view = pygame.transform.scale(self.observation, image.get_size())
         image.blit(view, (0, 0))
 
 
 
-class VisionSensorNoise(object):
+class SensorNoise(AbstractSensorNoise):
 
-    @staticmethod
-    def prior(x):
+    def prior(self, x):
         d = stats.cauchy(90, 100)
         return d.pdf(x) / d.pdf(0)
 
-    @staticmethod
-    def add(mat, level):
-        raise NotImplementedError()
+    def add(self, observation):
+        res = observation.copy()
+        mat = pygame.surfarray.pixels2d(res)
+        tmp = mat + self.create(mat)
+        # tmp = cv2.GaussianBlur(tmp, (5,5), 2)
+        mat[:] = np.clip(tmp, 0, 255)
+        return res
+
+class SensorNoiseGaussian(SensorNoise):
+
+    def create(self, mat):
+        prior = self.prior(mat)
+        sigma = prior * self.level * self.level * 127
+        return np.random.normal(0, sigma, mat.shape)
 
 
-class VisionSensorNoiseGaussian(VisionSensorNoise):
+class SensorNoiseSalt(SensorNoise):
 
-    @staticmethod
-    def add(mat, level):
-        prior = VisionSensorNoise.prior(mat)
-        sigma = prior * level * level * 127
-        noise = np.random.normal(0, sigma, mat.shape)
-        res = mat + noise
-        res = cv2.GaussianBlur(res, (5,5), 2)
-        mat[:] = np.clip(res, 0, 255)
-
-
-class VisionSensorNoiseSaltPepper(VisionSensorNoise):
-
-    @staticmethod
-    def add(mat, level):
-        probs = VisionSensorNoise.prior(mat)
-        probs /= np.sum(probs)
-        N = mat.size * level * level * 0.25
-
-        res = mat.astype(np.float)
-        ind = np.random.choice(res.size, N, p=probs.ravel())
+    def create(self, mat):
+        prior = self.prior(mat)
+        N = as_int(mat.size * self.level * self.level * 0.25)
+        res = np.zeros(mat.shape, dtype=np.int)
+        ind = np.random.choice(res.size, N, p=(prior/np.sum(prior)).ravel())
         pos = np.unravel_index(ind, res.shape)
-        res[pos] = np.random.randint(0, 2, N) * 255
-        res[:] = cv2.GaussianBlur(res, (5,5), 2)
-        mat[:] = np.clip(res, 0, 255)
+        res[pos] = 255
+        return res
+
+class SensorNoisePepper(SensorNoise):
+
+    def create(self, mat):
+        prior = self.prior(mat)
+        N = as_int(mat.size * self.level * self.level * 0.25)
+        res = np.zeros(mat.shape, dtype=np.int)
+        ind = np.random.choice(res.size, N, p=(prior/np.sum(prior)).ravel())
+        pos = np.unravel_index(ind, res.shape)
+        res[pos] = -255
+        return res
+
+class SensorNoiseSaltPepper(SensorNoise):
+
+    def create(self, mat):
+        prior = self.prior(mat)
+        N = as_int(mat.size * self.level * self.level * 0.25)
+        res = np.zeros(mat.shape, dtype=np.int)
+        ind = np.random.choice(res.size, N, p=(prior/np.sum(prior)).ravel())
+        pos = np.unravel_index(ind, res.shape)
+        res[pos] = (np.random.randint(0, 2, N)*2-1) * 255
+        return res
 
 
-class VisionSensorNoiseSpeckle(VisionSensorNoise):
+class SensorNoiseSpeckle(SensorNoise):
 
-    @staticmethod
-    def add(mat, level):
-        prior = VisionSensorNoise.prior(mat)
-        sigma = prior * level * level * 2
+    def create(self, mat):
+        prior = self.prior(mat)
+        sigma = np.sqrt(prior) * self.level * self.level * 2
         noise = np.random.normal(0, sigma, mat.shape)
-        res = mat + noise * 100 #(135.0 - np.abs(mat-120.0))
-        res = cv2.GaussianBlur(res, (5,5), 2)
-        mat[:] = np.clip(res, 0, 255)
+        res = (135.0 - np.abs(mat-120.0)) * noise
+        return res
 
 
-class VisionSensorNoiseModel(object):
-    GAUSSIAN    = VisionSensorNoiseGaussian
-    SALT_PEPPER = VisionSensorNoiseSaltPepper
-    SPECKLE     = VisionSensorNoiseSpeckle
+class SensorNoiseModel(object):
+    GAUSSIAN    = SensorNoiseGaussian
+    SALT        = SensorNoiseSalt
+    PEPPER      = SensorNoisePepper
+    SALT_PEPPER = SensorNoiseSaltPepper
+    SPECKLE     = SensorNoiseSpeckle
 
 
 
@@ -130,8 +139,8 @@ class Observation(object):
 
     @classmethod
     def _extract_location(cls, location, size, world):
-        start = np.array(location).astype(np.int)
-        end = start + np.array(size).astype(np.int)
+        start = location
+        end = start + size
         return world[ start[0]:end[0], start[1]:end[1] ]
 
 
@@ -154,7 +163,7 @@ class ObservationMDIFF(Observation):
 
     @classmethod
     def evaluate_at(cls, location, world, observation, observation_mean):
-        pos = tuple(location.astype(np.int))
+        pos = tuple(location)
         return -np.abs(world[pos] - observation_mean)
 
 
@@ -176,14 +185,14 @@ class ObservationCCOEFF(Observation):
 
     @classmethod
     def evaluate_global(cls, world, observation):
-        return cv2.matchTemplate(observation, world, cv2.TM_CCOEFF)
+        return cv2.matchTemplate(observation, world, cv2.TM_CCOEFF_NORMED)
 
     @classmethod
     def evaluate_at(cls, location, world, observation):
         model = cls._extract_location(location, observation.shape, world)
-        # norm = np.sqrt(np.sum(model*model) * np.sum(observation*observation))
-        # return np.sum( (model - np.mean(model)) * (observation - np.mean(observation)) ) / norm
-        return np.sum( (model - np.mean(model)) * (observation - np.mean(observation)) )
+        norm = np.sqrt(np.sum(model*model) * np.sum(observation*observation))
+        return np.sum( (model - np.mean(model)) * (observation - np.mean(observation)) ) / norm
+        # return np.sum( (model - np.mean(model)) * (observation - np.mean(observation)) )
 
 
 class ObservationCCORR(Observation):

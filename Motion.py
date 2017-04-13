@@ -1,130 +1,119 @@
 
 import numpy as np
-import cv2
 import pygame
+import cv2
 
 from scipy import linalg
 from scipy import stats
 
+from Sensor import Sensor as AbstractSensor
+from Sensor import SensorNoise as AbstractSensorNoise
 
-class MotionSensor(object):
+class Sensor(AbstractSensor):
 
-    def __init__(self, state):
-        self._last = state
-        self._motion = np.zeros(self._last.shape)
+    def __init__(self, fps = 10):
+        super(Sensor, self).__init__(fps)
+        self._last = None
 
-    @property
-    def observation(self):
-        return self._motion
+    def _observe(self, what):
+        if self._last is None: self._last = what
+        motion = what - self._last
+        self._last = what
+        return motion
 
-    def observe(self, state):
-        self._motion = state - self._last
-        self._last = state
-
-    def add_noise(self, noisemodel, level=0.5):
-        noisemodel.add(self._motion, level, level)
-
-    # def draw(self, image):
-    #     pos = np.mod(self._last[0:2] - self._motion[0:2], image.get_size())
-    #     # pos -= self.size/2
-    #     pygame.draw.line(image, (255,0,0), pos, self._last[0:2]*10, 2)
+    def _draw(self, image):
+        pos = np.mod(self._last - self.observation, image.get_size())
+        pygame.draw.line(image, (255,0,0), pos, self._last + 10 * self.observation, 2)
 
 
-class MotionSensorNoise(object):
+class SensorNoise(AbstractSensorNoise):
+    pass
 
-    @staticmethod
-    def add(motion, level_pos, level_rot):
-        raise NotImplementedError()
+class SensorNoiseGaussian(SensorNoise):
 
-    @staticmethod
-    def prob(motion, motion_ref, level_pos, level_rot):
-        raise NotImplementedError()
-
-
-class MotionSensorNoiseGaussian(MotionSensorNoise):
-
-    @staticmethod
-    def add(motion, level_dist, level_rot):
-        dist = linalg.norm(motion[0:2])
-        motion[0:2] *= stats.norm.rvs(1, level_dist)
-        motion[2] += stats.norm.rvs(0, level_rot)
-
-    @staticmethod
-    def prob(motions, motion_ref, level_dist, level_rot):
-        vec = motion_ref[0:2]
-        vecs = motions.T[0:2,]
-        mag = linalg.norm(vec)
-        mags = linalg.norm(vecs, axis=0)
-
-        sigma = max(mag, 0.5)*level_dist/5.0
-        probs = stats.norm.pdf(mags, mag, sigma)
-
-        norm = mags * mag
-        indices = norm.nonzero()[0]
-        angles = np.ones(len(motions))
-        angles[indices] = vec.dot(vecs[:,indices]) / norm[indices]
-        # probs = probs * stats.norm.pdf(angles, 1, level_rot*level_rot/2.0)
-
-        return probs/np.max(probs)
-
-        # only positional data is considered
-        # rot = motions.T[2,] - motion_ref[2]
-        # rot_p = stats.norm.pdf(rot, 1, level_rot)
+    def create(self, motion):
+        level_dist, level_rot = self.level
+        mag = linalg.norm(motion) + 1.0
+        return stats.multivariate_normal.rvs((0,0), mag*level_dist/5.0)
 
 
-class MotionSensorNoiseModel(object):
-    GAUSSIAN  = MotionSensorNoiseGaussian
+class SensorNoiseAdvanced(SensorNoise):
+
+    def create(self, motion):
+        level_dist, level_rot = self.level
+        vec = stats.multivariate_normal.rvs(motion, level_dist/5.0)
+
+        mag = np.maximum(linalg.norm(vec), 0.0001 )
+
+        # create noise
+        noise_rot = stats.norm.rvs(0, level_rot*level_rot/2.0)
+        noise_dist = stats.norm.rvs(0, level_dist/2.0)
+
+        # rotate direction vector
+        sin_angle = np.sin(noise_rot)
+        cos_angle = np.cos(noise_rot)
+        dir_x = vec[0] * cos_angle - vec[1] * sin_angle
+        dir_y = vec[0] * sin_angle + vec[1] * cos_angle
+        vec = np.array( (dir_x, dir_y) )
+
+        vec += vec * noise_dist
+        return vec - motion
 
 
-class Motion(object):
+class SensorNoiseModel(object):
+    GAUSSIAN  = SensorNoiseGaussian
+    ADVANCED = SensorNoiseAdvanced
 
+
+
+
+
+class Observation(object):
 
     @classmethod
-    def kernel(cls, density, motion, noisemodel):
-        kernel_size = 49
-        motions = -np.vstack(np.mgrid[-kernel_size/2:kernel_size/2+1, -kernel_size/2:kernel_size/2+1].T) + motion[0:2]
-        kernel = noisemodel.prob(motions, motion, 2.0, 0.6).reshape((kernel_size+1, kernel_size+1)).T
+    def evaluate(cls, observation, kernel_size):
+        motions = np.vstack(np.indices(kernel_size).transpose(1,2,0)) - np.array(kernel_size)/2 + observation
+        kernel = cls.evaluate_at(motions, observation).reshape(kernel_size)
+        kernel = cv2.GaussianBlur(kernel, (15,15), 1.0)
+        kernel /= np.sum(kernel)
         return kernel
 
     @classmethod
-    def propagate_density(cls, density, motion, noisemodel):
-
-        kernel_size = 49
-        motions = -np.vstack(np.mgrid[-kernel_size/2:kernel_size/2+1, -kernel_size/2:kernel_size/2+1].T) + motion[0:2]
-        kernel = noisemodel.prob(motions, motion, 2.0, 0.6).reshape((kernel_size+1, kernel_size+1)).T
-
-        density = cv2.filter2D(density, -1, kernel, borderType=cv2.BORDER_WRAP)
-        density = np.roll(density, motion[0:2].astype(np.int), axis=(0,1))
-
-        return density
-
-    @classmethod
-    def propagate_global(cls, world, observation):
+    def evaluate_at(cls, motions, observation):
         raise NotImplementedError()
 
-    @classmethod
-    def propagate_local(cls, locations, world, observation):
-        return np.apply_along_axis(cls.evaluate_at, 1, locations, world, observation)
+class ObservationGaussian(Observation):
 
     @classmethod
-    def propagate_at(cls, location, world, observation):
-        raise NotImplementedError()
+    def evaluate_at(cls, motions, observation):
+        probs = linalg.norm(motions - observation, axis=1)
+        return np.exp(-probs)
+
+class ObservationAdvanced(Observation):
+
+    level_dist = 0.2
+    level_rot = 0.5
+
+    @classmethod
+    def evaluate_at(cls, motions, observation):
+        probs = np.zeros(len(motions))
+
+        mag = np.maximum(linalg.norm(observation), 0.001)
+        mags = linalg.norm(motions, axis=1)
+        indices = mags.nonzero()[0]
+
+        probs += stats.norm.logpdf( mags/mag, 1, cls.level_dist/2.0)
+
+        angles = np.ones(len(motions))
+        angles[indices] = observation.dot(motions[indices,:].T) / (mags[indices] * mag)
+        probs += stats.norm.logpdf(angles, 1, cls.level_rot*cls.level_rot/2.0)
+
+        return np.exp(probs)
 
 
+class ObservationModel(object):
+    GAUSSIAN = ObservationGaussian
+    ADVANCED = ObservationAdvanced
 
-class MotionModel(object):
 
-    @staticmethod
-    def evaluate(motion, particles):
-        vel = motion[0:2]
-        rot = motion[2:3]
-
-        def noiseFun(pos):
-            # print(pos)
-            n = np.random.normal(0, 2, 2)
-            return pos + vel + n
-
-        particles.positions = np.apply_along_axis(noiseFun, 1, particles.positions)
-
-        return particles
 

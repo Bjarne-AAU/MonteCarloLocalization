@@ -40,16 +40,9 @@ from World import create_palette
 
 from Robot import Robot
 
-from Observation import VisionSensor
-from Observation import VisionSensorNoiseModel
-from Observation import ObservationModel
-
-from Motion import MotionSensor
-from Motion import MotionSensorNoiseModel
-from Motion import MotionModel
-from Motion import Motion
-
-from particles import *
+import Vision
+import Motion
+import Representation
 
 np.set_printoptions(suppress=True)
 np.set_printoptions(linewidth=150)
@@ -73,34 +66,43 @@ robot_pos_x = map_width/2
 robot_pos_y = map_height/2
 robot_image = "gui/rocket.png"
 
-N_particles = 500
-sample_threshold = N_particles*0.40
-
-#old_pos = np.array( (robot_state, robot_pos_y) )
-robot_state = np.array([robot_pos_x, robot_pos_y, 0])
 
 win = MainWindow(win_width, win_height, "Monte Carlo Localization - Demo application")
 win.FPS = 30
 win.set_option("seed", map_seed)
 
+vs = (15,15)
 
-vision_sensor = VisionSensor((robot_width*2, robot_height*2))
-motion_sensor = MotionSensor(robot_state)
+vision = Vision.Sensor(vs)
+motion = Motion.Sensor()
+
+# OPTIONS for noise: GAUSSIAN, SALT, PEPPER, SALT_PEPPER, SPECKLE
+# OPTIONS for model: MDIFF, SQDIFF, CCORR, CCOEFF
+vision_sensor = Vision.Sensor(vs, fps=5)
+vision_sensor_noise = Vision.SensorNoiseModel.GAUSSIAN(0.7)
+vision_sensor.set_noise_model(vision_sensor_noise)
+vision_model = Vision.ObservationModel.MDIFF
+
+# OPTIONS for noise: GAUSSIAN, ADVANCED
+# OPTIONS for model: GAUSSIAN, ADVANCED
+motion_sensor = Motion.Sensor(fps = 15)
+motion_sensor_noise = Motion.SensorNoiseModel.ADVANCED( (0.3,0.5) )
+motion_sensor.set_noise_model(motion_sensor_noise)
+motion_model = Motion.ObservationModel.ADVANCED
+
+# REPRESENTATION
+# density = Representation.Grid( (map_width, map_height) )
+density = Representation.Particles( 1000, (map_width, map_height) )
 
 
 
-
-
-
-
-like_m = None
-posterior_m = None
 
 clock = pygame.time.Clock()
 while win.running:
     events = win.get_events()
 
     dt = clock.tick()/1000.0
+
     keys = np.array(pygame.key.get_pressed())
     keys = np.where(keys)[0]
     for key in keys:
@@ -120,109 +122,43 @@ while win.running:
             print("Generate {} with seed {}".format(win.get_option("world"), seed))
             world = WorldMap(map_width, map_height, pad_x=40, pad_y=40, scale=8, colors=world_type, type=NOISE.SIMPLEX, seed=seed)
             robot = Robot(robot_pos_x, robot_pos_y, 0, robot_width, robot_height, robot_image)
-            particles = Particles(N_particles,world)
-
-
-    mainmap = win.get_mainmap_canvas()
-    world.draw(mainmap)
-
-    robot.update(dt)
-    motion_sensor.observe(robot.state)
-    motion_sensor.add_noise(MotionSensorNoiseModel.GAUSSIAN, 0.5)
-    # motion_sensor.draw(mainmap)
-
-
-    robot_motion = robot.state - robot_state
-
-    MLE = None
-    MAP = None
+            density.reset()
 
     if win.get_option("reset"):
-        particles = Particles(N_particles,world)
-        posterior_m = None
-        like_m = None
+        density.reset()
         win.reset_option("reset")
 
 
-    if win.get_option("start") or win.get_option("step"):
-        particles = MotionModel.evaluate(robot_motion, particles)
-        if not win.get_option("particle_posterior"):
-            like_m = ObservationModel.MDIFF.evaluate(vision_sensor.observation, world)
-            if posterior_m is None: posterior_m = np.ones(like_m.shape, dtype=np.float)
+    is_active = win.get_option("start") or win.get_option("step")
 
-            # kx = int(dt * np.sqrt(robot_motion[1] * robot_motion[1]) * 15.0) * 2 + 3
-            # ky = int(dt * np.sqrt(robot_motion[0] * robot_motion[0]) * 15.0) * 2 + 3
-            # posterior_m = cv2.GaussianBlur(posterior_m, (kx, ky), cv2.BORDER_WRAP)
+    # Move robot
+    robot.update(dt)
 
-            # posterior_m = np.roll(posterior_m, int(round(robot_motion[0])), 0)
-            # posterior_m = np.roll(posterior_m, int(round(robot_motion[1])), 1)
+    # Observation for display
+    vision.observe( (robot.pos, world) )
+    motion.observe( robot.pos )
 
-            kernel = Motion.kernel(posterior_m, robot_motion, MotionSensorNoiseModel.GAUSSIAN)
-            kern = pygame.surfarray.make_surface((kernel * 255))
-            kern.set_palette(create_palette(cm.gray))
-            mainmap.blit(kern, (800-kernel.shape[0], 600-kernel.shape[1]))
+    # Observe motion and propagate density/particles accordingly
+    if is_active:
+        if motion_sensor.observe( robot.pos ):
+            density.propagate(motion_sensor.observation, motion_model)
 
+    # Observe view and update density/particles accordingly
+    if vision_sensor.observe( (robot.pos, world) ):
+        if is_active:
+            density.update(vision_sensor.observation, world, vision_model)
 
-            posterior_m = Motion.propagate_density(posterior_m, robot_motion, MotionSensorNoiseModel.GAUSSIAN)
-            # posterior_m += 0.0001
+    win.reset_option("step")
 
-            MLE = np.unravel_index(like_m.argmax(), like_m.shape)
-            posterior_m *= like_m
-            #posterior_m = np.exp(posterior_m - np.max(posterior_m))
-            posterior_m = posterior_m/np.max(posterior_m)
+    # Draw
+    mainmap = win.get_mainmap_canvas()
 
-            MAP = np.unravel_index(posterior_m.argmax(), posterior_m.shape)
-            if like_m is not None and win.get_option("show_likelihood"):
-                like = pygame.surfarray.make_surface((like_m * 240 + 15))
-                like.set_palette(create_palette(cm.gray))
-                mainmap.blit(like, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+    world.draw(mainmap)
 
-            if posterior_m is not None and win.get_option("show_posterior"):
-                posterior = pygame.surfarray.make_surface((posterior_m * 240 + 15))
-                posterior.set_palette(create_palette(cm.gray))
-                mainmap.blit(posterior, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
-
-        else:
-            like_m = ObservationModel.MDIFF.evaluate(vision_sensor.observation, world, particles.positions)
-
-            if posterior_m is None: posterior_m = np.ones(like_m.shape, dtype=np.float)
-
-            posterior_m *= like_m
-            posterior_m += 0.01
-
-            posterior_m = posterior_m/np.max(posterior_m)
-            particles.weights = posterior_m
-            index = posterior_m.argmax()
-            MAP = (particles.at(index)[0:2]).astype(np.int)
-            if particles.effectiveN < sample_threshold:
-                particles.resample()
-                # posterior_m[:] = 1.0
-
-        robot_state = robot.state
-        win.reset_option("step")
-
-
-
-
-
-    if posterior_m is not None and win.get_option("draw_particle"):
-       # print particles.positions.shape
-        for n in range(particles.N):
-            particle_x = particles.at(n)[0]
-            particle_y = particles.at(n)[1]
-            pygame.draw.circle(mainmap, (255,0,0), np.round(np.array([particle_x,particle_y])).astype(np.int),
-                np.round(posterior_m[n]*10).astype(np.int))
-
-
-
-
-
-    if MLE is not None:
-        pygame.draw.circle(mainmap, (255,0,0), MLE, 5, 2)
-
-    if MAP is not None:
-        pygame.draw.circle(mainmap, (0,255,0), MAP, 10, 2)
-
+    if win.get_option("show_posterior"):
+        density.draw(mainmap, Representation.TYPE.DENSITY)
+    elif win.get_option("show_likelihood"):
+        density.draw(mainmap, Representation.TYPE.LIKELIHOOD)
 
     if not win.get_option("hide_robot"):
         robot.scale = 1.0
@@ -230,20 +166,20 @@ while win.running:
         robot.draw(mainmap)
 
 
-    vision_sensor.observe(robot.pos, world)
-    # vision_sensor.add_noise(VisionSensorNoiseModel.SALT_PEPPER, 0.6)
-    # vision_sensor.add_noise(VisionSensorNoiseModel.SPECKLE, 0.7)
-    vision_sensor.add_noise(VisionSensorNoiseModel.GAUSSIAN, 0.5)
-
     minimap = win.get_minimap_canvas()
 
-    vision_sensor.draw(minimap)
+    if is_active:
+        # motion_sensor.draw(mainmap)
+        vision_sensor.draw(minimap)
+    else:
+        # motion.draw(mainmap)
+        vision.draw(minimap)
+
+    # density.draw(minimap, Representation.TYPE.KERNEL)
 
     robot.scale = 5.0
     robot.set_color(0,0,0,80)
     robot.draw(minimap, minimap.get_rect().center)
-
-
 
     win.update()
 
