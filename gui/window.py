@@ -87,8 +87,8 @@ class MainWindow(object):
             "hide_robot" : widget.CheckBox(self._menu, position=(5,145), text = "Hide robot"),
             "show_likelihood" : widget.CheckBox(self._menu, position=(5,165), text = "Show likelihood"),
             "show_posterior" : widget.CheckBox(self._menu, position=(5,185), text = "Show posterior"),
-            "draw_particle" : widget.CheckBox(self._menu, position=(5,205), text = "Draw particles"),
-            "particle_posterior" : widget.CheckBox(self._menu, position=(5,225), text = "Particles posterior")
+            "show_kernel" : widget.CheckBox(self._menu, position=(5,205), text = "Show kernel"),
+            "show_estimate" : widget.CheckBox(self._menu, position=(5,225), text = "Show estimate")
         }
 
 

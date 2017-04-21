@@ -41,8 +41,8 @@ class Representation(object):
             return self._locations[np.argmax(self._likelihood)]
         elif estimate_type == ESTIMATE.EXP:
             mean = np.average(self._locations, weights=self._density.ravel(), axis=0)
-            var  = np.average(np.square(self._locations - mean), weights=self._density.ravel(), axis=0)
-            return (mean, var)
+            #var  = np.average(np.square(self._locations - mean), weights=self._density.ravel(), axis=0)
+            return mean
 
     def propagate(self, motion, motion_model):
         raise NotImplementedError()
@@ -67,9 +67,9 @@ class Representation(object):
 
         self._draw(image, data/np.max(data))
 
-        if data_type != TYPE.KERNEL:
-            EXP,_ = self.estimate(ESTIMATE.EXP)
-            pygame.draw.circle(image, (0,255,0), as_int(EXP), 10, 3)
+    def draw_estimate(self, image, type):
+        est = self.estimate(type)
+        pygame.draw.circle(image, (255,0,0), as_int(est), 10, 3)
 
 
 class Grid(Representation):
@@ -110,8 +110,9 @@ class Particles(Representation):
 
     def propagate(self, motion, motion_model):
         if self.N_effective < 0.5 * self.N:
-            self.resample_stratified()
-            # self.resample_systematic()
+            # self.resample_naive()
+            # self.resample_stratified()
+            self.resample_systematic()
 
         self._kernel = motion_model.evaluate(motion, self._kernel.shape)
         indices = np.random.choice(self._kernel.size, len(self._locations), p=self._kernel.ravel())
@@ -137,38 +138,22 @@ class Particles(Representation):
             for pos, w in zip(self.locations, weights/np.max(weights)):
                 pygame.draw.circle(image, (255,0,0), pos, as_int(w*5))
 
-            # mean, var = self.estimate(ESTIMATE.EXP)
-            # ellipse = pygame.Rect( (0, 0), as_int(np.sqrt(var)) + 10)
-            # ellipse.center = as_int(mean)
-            # pygame.draw.ellipse(image, (0,255,0), ellipse, 3)
-
-            EXP,_ = self.estimate(ESTIMATE.EXP)
-            pygame.draw.circle(image, (0,255,0), as_int(EXP), 10, 3)
-
-            # MAP = self.estimate(ESTIMATE.MAP)
-            # pygame.draw.circle(image, (0,255,0), as_int(MAP), 10, 3)
-
-
 
     def resample_naive(self):
-        indices = np.random.choice(self.N, self.N, p=self._density/np.sum(self._density), replace=True)
-        self._locations = self._locations[indices]
-        self._density = self._density[indices]
-        self._density /= np.sum(self._density)
-        # self._density = 1.0/self.N
+        positions = np.random.random(self.N)
+        self._resample_indices(positions)
 
     def resample_stratified(self):
         positions = (np.arange(self.N) + np.random.random(self.N)) / self.N
-        indices = np.searchsorted(np.cumsum(self._density), positions, side='right')
-        self._locations = self._locations[indices]
-        self._density = self._density[indices]
-        self._density /= np.sum(self._density)
-        # self._density = 1.0/self.N
+        self._resample_indices(positions)
 
     def resample_systematic(self):
         positions = (np.arange(self.N) + np.random.random()) / self.N
+        self._resample_indices(positions)
+
+    def _resample_indices(self, positions):
         indices = np.searchsorted(np.cumsum(self._density), positions, side='right')
         self._locations = self._locations[indices]
         self._density = self._density[indices]
         self._density /= np.sum(self._density)
-        # self._density = 1.0/self.N
+        # self._density[:] = 1.0/self.N

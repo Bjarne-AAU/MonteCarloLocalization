@@ -95,8 +95,6 @@ motion_model = Motion.ObservationModel.ADVANCED
 density = Representation.Particles( 1000, (map_width, map_height) )
 
 
-
-
 clock = pygame.time.Clock()
 while win.running:
     events = win.get_events()
@@ -157,8 +155,12 @@ while win.running:
 
     if win.get_option("show_posterior"):
         density.draw(mainmap, Representation.TYPE.DENSITY)
+        if win.get_option("show_estimate"):
+            density.draw_estimate(mainmap, Representation.ESTIMATE.MAP)
     elif win.get_option("show_likelihood"):
         density.draw(mainmap, Representation.TYPE.LIKELIHOOD)
+        if win.get_option("show_estimate"):
+            density.draw_estimate(mainmap, Representation.ESTIMATE.MLE)
 
     if not win.get_option("hide_robot"):
         robot.scale = 1.0
@@ -175,7 +177,8 @@ while win.running:
         # motion.draw(mainmap)
         vision.draw(minimap)
 
-    # density.draw(minimap, Representation.TYPE.KERNEL)
+    if win.get_option("show_kernel"):
+        density.draw(minimap, Representation.TYPE.KERNEL)
 
     robot.scale = 5.0
     robot.set_color(0,0,0,80)
