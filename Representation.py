@@ -80,7 +80,7 @@ class Grid(Representation):
     def propagate(self, motion, motion_model):
         self._kernel = motion_model.evaluate(motion, self._kernel.shape)
         self._density = cv2.filter2D(self._density, -1, np.flipud(np.fliplr(self._kernel)), borderType=cv2.BORDER_WRAP)
-        self._density = np.roll(self._density, np.round(motion).astype(np.int), axis=(0,1))
+        self._density = np.roll(self._density, shift=np.round(motion).astype(np.int), axis=(0,1))
         self._density /= np.sum(self._density)
 
     def update(self, view, model, observation_model):
