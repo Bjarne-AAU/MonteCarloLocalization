@@ -15,3 +15,17 @@ Libraries can be installed via pip.
  * noise [1.2.1]: http://github.com/caseman/noise
  * pygame [1.9.1]: http://www.pygame.org
  * opencv-python [2.4.8]: http://opencv.org
+
+
+## Structure
+
+### Derivation of sequential Bayes filter
+
+### Sensor models and noise
+
+### Observation model
+
+### Motion model
+
+### Respresentations
+
