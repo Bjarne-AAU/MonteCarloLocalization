@@ -17,15 +17,4 @@ Libraries can be installed via pip.
  * opencv-python [2.4.8]: http://opencv.org
 
 
-## Structure
-
-### Derivation of sequential Bayes filter
-
-### Sensor models and noise
-
-### Observation model
-
-### Motion model
-
-### Respresentations
 
