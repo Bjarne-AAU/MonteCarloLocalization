@@ -86,8 +86,11 @@ class ObservationGaussian(Observation):
 
     @classmethod
     def evaluate_at(cls, motions, observation):
-        probs = linalg.norm(motions - observation, axis=1)
-        return np.exp(-probs)
+        mag = np.maximum(linalg.norm(observation), 0.001)
+        # probs = linalg.norm(motions - observation, axis=1)
+        # return np.exp(-probs)
+
+        return stats.multivariate_normal.pdf(motions, observation, mag*0.5)
 
 class ObservationAdvanced(Observation):
 

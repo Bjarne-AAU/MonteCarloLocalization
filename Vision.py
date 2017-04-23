@@ -32,8 +32,10 @@ class Sensor(AbstractSensor):
 class SensorNoise(AbstractSensorNoise):
 
     def prior(self, x):
-        d = stats.cauchy(90, 100)
-        return d.pdf(x) / d.pdf(0)
+        d1 = stats.cauchy(90, 50)
+        d2 = stats.cauchy(30, 100)
+        res = d1.pdf(x) + d2.pdf(x)
+        return res/(d1.pdf(90) + d2.pdf(90))
 
     def add(self, observation):
         res = observation.copy()
@@ -47,7 +49,7 @@ class SensorNoiseGaussian(SensorNoise):
 
     def create(self, mat):
         prior = self.prior(mat)
-        sigma = prior * self.level * self.level * 127
+        sigma = prior * self.level * self.level * 100
         return np.random.normal(0, sigma, mat.shape)
 
 
