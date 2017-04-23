@@ -91,7 +91,7 @@ motion_sensor.set_noise_model(motion_sensor_noise)
 motion_model = Motion.ObservationModel.ADVANCED
 
 # REPRESENTATION
-# density = Representation.Grid( (map_width, map_height) )
+#density = Representation.Grid( (map_width, map_height) )
 density = Representation.Particles( 1000, (map_width, map_height) )
 
 
