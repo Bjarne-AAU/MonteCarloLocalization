@@ -136,7 +136,35 @@ This is reflected by the two noise models:
 
 # Motion model
 
+Motion model is used to predict the new position of the density or particles depending on the commands given to the robot. We used two motion models, a naive one and an advanced one. 
+  * The naive model moves the density or particles based on the motion vector and adds Gaussian noise to this new position.
+  ```
+    def naive(cls, motions, observation):
+        probs = linalg.norm(motions - observation, axis=1)
+        return np.exp(-probs)
+  ```
+  * The advanced model is an odometry-based model. Here, the density or particles are moved based on the rotation and translation of the robot. Then, it is added Gaussian noise to each of these parameters. This model is more accurate, as the robot can have either an error on distance traveled or on the directation that it was facing during the movement. This model follows this conditional probability density
+  
+  $ p(x_t|x_{t?1}, u_t)$
+  
+  where $x_t$ is the current position, $x_{t-1}$ is the previous position and $u_t$ are the parameters that affects the movement (rotation and translation).
+  
+  ```
+   def advanced(cls, motions, observation):
+        probs = np.zeros(len(motions))
 
+        mag = np.maximum(linalg.norm(observation), 0.001)
+        mags = linalg.norm(motions, axis=1)
+        indices = mags.nonzero()[0]
+
+        probs += stats.norm.logpdf( mags/mag, 1, cls.level_dist/2.0)
+
+        angles = np.ones(len(motions))
+        angles[indices] = observation.dot(motions[indices,:].T) / (mags[indices] * mag)
+        probs += stats.norm.logpdf(angles, 1, cls.level_rot*cls.level_rot/2.0)
+
+        return np.exp(probs)
+   ```
 
 # Observation model
 
