@@ -10,16 +10,16 @@ author:
 # Introduction
 
 Monte Carlo localization is a method common in mobile robotics that enables a robot to estimate its location within a known environment using a recursive Bayesian estimation approach.
-The robot is equipped with different sensors to sense and observe the environment as it moves around.
-Using a given map, it then uses the observations to sequentically infer its location within that map.
+The robot is equipped with different sensors to sense and observe the environment as it moves around the landscape.
+Using a given map of that landscape, it then uses the observations to sequentially infer its location within that map.
 
-In Bayesian terms, the recursive Bayesian estimation (or Bayesian filter) is a general method to estimate an unknown probability density function over time by incorporating new observation through an observation and a processing model.
-The probability density function represents the belief over the states of a dynamic system and can therefore be seen a a filtering process to eliminate less probable states and eventually estimate the true underlying state.
-The computation of the posterior distribution is often untractable due to the complexity of the observation model and the dynamically changing state and is therefore often approximated by grid-based or particle-based Monte Carlo methods.
+In Bayesian terms, the recursive Bayesian estimation (or Bayesian filter) is a general method to estimate an unknown probability density function over time by incorporating new observation through a processing and observation model.
+The probability density function represents the belief over the states of a dynamic system and can therefore be seen as a filtering process that eliminates less probable states and eventually estimates the true underlying state.
+The computation of the posterior distribution is often untractable due to the complexity of the observation model and the dynamically changing state, and is therefore often approximated by grid-based or particle-based Monte Carlo methods.
 
-In this project, we developed an demonstration application that shows the mechanism behind the recursive Bayesian estimation for grid- and particle-based Monte Carlo methods in a localization scenario.
-In this simulation, we send a autonomous robot or spacecraft to a remote area or planet which topological map is known beforehand.
-The spacecraft is equipped with a vision sensor observing the height of the terrain nearby, and a motion sensor measuring the motion of the spacecraft.
+In this project, we developed a demonstration application that shows the mechanism behind the recursive Bayesian estimation for grid and particle-based Monte Carlo methods in a localization scenario.
+In this simulation, we send an autonomous robot (or spacecraft) to a remote area (or planet). The spacecraft knows a topological map of the landscape.
+The spacecraft is also equipped with a vision sensor observing the elevation of the terrain nearby, and a motion sensor measuring the motion of the spacecraft.
 Using these noisy observations, the task is to estimate our location with respect to the given topological map.
 
 
@@ -32,8 +32,8 @@ The state space $\Omega$ can be represented by all possible states
 \theta = (x,y) \in \Omega \quad \text{ with } 0 < x < x_{max} \text{ and } 0 < y < y_{max} \nonumber
 \end{equation}
 
-and our goal is to find a good estimate $\hat{\theta_t}$ of the real state $\theta_t$ at time t.
-We can formulate the belief $Bel(\theta_t)$ of possible states at a time $t$ given the independent observations $z_{0:t}$ and motions $u_{0:t}$ (note that we do not explicitly state the conditioning on $u_{0:t}$ for readability) in a probabilistic manner as
+Our goal is to find a good estimate $\hat{\theta_t}$ of the true state $\theta_t$ at time $t$.
+We can formulate the belief $Bel(\theta_t)$ of possible states at a time $t$ given the independent observations of the terrain $z_{0:t}$ and motions $u_{0:t}$ (note that we do not explicitly state the conditioning on $u_{0:t}$ for readability) in a probabilistic manner as
 
 \begin{equation}
 Bel(\theta_{t}) = p(\theta_t | z_{0:t})
@@ -52,7 +52,7 @@ and the predictive distribution
 p(\theta_t | z_{0:t-1}) = \int p(\theta_t | \theta_{t-1}) \ p(\theta_{t-1} | z_{0:t-1} ).
 \end{equation}
 
-The system can be fullydetermined by defining the **observation model**
+The system can be fully determined by defining the **observation model**
 $p(z_t | \theta_t) = p(z_t | \theta_t, \mathcal{M})$
 to compute the likelihood of the observation $z_t$ at location $\theta_t$ given the map model $\mathcal{M}$, and the **motion model** given by the transition distribution
 $p(\theta_t | \theta_{t-1}) = p(\theta_t | \theta_{t-1}, u_t)$
@@ -75,7 +75,7 @@ or the Maximum A-Posteriori estimate (or the maximum mode)
 
 # Derivation of sequential Bayes filter
 
-We shall in this section derive and formulate the *Recursive Bayesian Estimation* or Bayes Filter. The purpose is to lay the foundation for the application known as particle filtering. Specifically, we will use the *Sequential Importance Resampling* (SIR). Of those algorithms associated with SIR we utilize the special case known as *Bootstrap filter*.
+We shall in this section derive and formulate the *Recursive Bayesian Estimation* or Bayes Filter. The purpose is to lay the foundation for the application known as particle filtering. Specifically, we will use the *Sequential Importance Resampling* (SIR). Of those algorithms associated with SIR we utilize the special case known as *Bootstrap filter*. We generalize the notation for the derivation of SIR. 
 
 ## Bayesian Network of The Hidden Markov Model (HMM)
 
@@ -98,7 +98,7 @@ For completion, we can then write the entire joint probability for a time sequen
 p(x_{1:k},z_{1:k}) = p(x_1) \prod_{i=2}^k p(z_i|x_i)p(x_i|x_{i-1}).
 \end{equation}
 
-However, for predictive purposes, we wish to find the distribution of the current state $x_k$ conditioned on all previous states. Since we assume any hidden state is independent of all previous hidden states, except the immediate previous one, we whish to infer,
+However, for predictive purposes, we wish to find the distribution of the current state $x_k$ conditioned on all previous states. Since we assume any hidden state is independent of all previous hidden states, except the immediate previous one, we wish to infer,
 
 \begin{equation}
 p(x_k|z_{1:k}) = \frac{p(z_{1:k}|x_k)p(x_k)}{p(z_{1:k})}=\frac{p(z_k|x_k)p(z_{1:k-1} |x_k)p(x_k)}{p(z_{1:k})}=\frac{p(z_k|x_k)p(x_k|z_{1:k-1} )p(z_{1:k-1} )}{p(z_{1:k})}=\frac{p(z_k|x_k)p(x_k|z_{1:k-1} )}{p(z_{k}|z_{1:k-1} )}.
@@ -109,11 +109,15 @@ As we shall see later, we explicitly model $p(z_k|x_k)$, thus leaving us to refo
 \begin{equation}
     p(x_k|z_{1:k-1} ) = \int \frac{p(x_k,x_{k-1},z_{1:k-1} )}{p(z_{1:k})}dx_{k-1} = \int \frac{p(x_k|x_{k-1})p(z_{1:k-1} | x_{k-1} ) p(x_{k-1})}{p(z_{1:k})}dx_{k-1} =\int p(x_k|x_{k-1})p( x_{k-1} | z_{1:k-1})dx_{k-1},
 \end{equation}
-where we further utilized the following assumption $p(x_k,z_{1:k-1}|x_{k-1}) = p(x_k|x_{k-1})p(z_{1:k-1} | x_{k-1} )$.
+where we further utilize the following assumption
+
+\begin{equation}
+$p(x_k,z_{1:k-1}|x_{k-1}) = p(x_k|x_{k-1})p(z_{1:k-1} | x_{k-1} )$.
+\end{equation}
 
 We, then identify the previous equation as an average of $p(x_k|x_{k-1})$ over the conditional probability density of $x_{k-1}$. Thus, referring to Chap. 10 (*A. Gelman, J. Carlin, H. Stern, D. Dunson, A. Vehtari, and D. Rubin, Bayesian
 Data Analysis, Third Edition (Chapman & Hall/CRC Texts in Statistical Science)
-(Chapman and Hall/CRC), 3rd edn. (2014).*), we can estimate said expected value through importance sampling, as sampling $x_{k-1}$ in it's current form is non-trivial. Hence, by denoting a proposal distribution as $\pi(\theta)$, where $\theta$ denotes all relevant parameters associated with the HMM model, we write,
+(Chapman and Hall/CRC), 3rd edn. (2014).*), we can estimate the aforementioned expected value through importance sampling, as sampling $x_{k-1}$ in it's current form is non-trivial. Hence, by denoting a proposal distribution as $\pi(\theta)$, where $\theta$ denotes all relevant parameters associated with the HMM model, we write,
 
 \begin{equation}
 p(x_k|z_{1:k-1} ) \simeq \sum_{s=1}^S p(x_k|x_{k-1}^s)\tilde{w(\theta)^s},
@@ -145,25 +149,25 @@ Particle filters rely on the simple concept assigning each weight to a unique pa
     \{x_k^s,\tilde{w_k}^s~|~s = 1,2,\dots,S\}.
 \end{equation}
 
-The fundamental idea is, that for each timestep we keep our samples/particles, but update their weights. We formualte this as,
+The fundamental idea is, that for each time step we keep our samples/particles, but update their weights. We formualte this as,
 
 \begin{equation}
     p(x_k^s|x_\alpha^l) = \begin{cases} p(x_k^s|x_\alpha^s) & s =l \\ 0 & \text{otherwise} \end{cases}.
 \end{equation}
 
-Consequently, we still draw samples, but the net effect is that each samples is simply updated, and one can kee track of each samples/particle's weigths development through a sequence. Armed, with the particle formulation, we simplify the weights update as follows,
+Consequently, we still draw samples, but the net effect is that each sample is simply updated, and one can keep track of each sample/particle's weights development through a sequence. Armed with the particle formulation, we simplify the weights' update as follows:
 
 \begin{equation}
 w^s_k = \frac{p( x_{\alpha}^s | z_{1:\alpha})}{\pi(\theta^s)} \propto \frac{p(z_\alpha|x^s_\alpha) p(x_\alpha^s|x_{\alpha-1}^s)\tilde{w_{k-1}}^s}{\pi(\theta^s)}.
 \end{equation}
 
-By choosing $\pi(\theta^s) = p(x_\alpha^s|x_{\alpha-1}^s)$, we arrive at the bootstrap filter, and we each weight is thus updated as,
+By choosing $\pi(\theta^s) = p(x_\alpha^s|x_{\alpha-1}^s)$, we arrive at the bootstrap filter, where each weight is updated as:
 
 \begin{equation}
 w^s_k =p(z_{k-1}|x^s_{k-1})\tilde{w_{k-1}}^s.
 \end{equation}
 
-This formulation completely allows us to ignore the exact form of the original distribution $p(x_{k-1}|z_{1:k-1})$, making the particle an intuitive sampling algorithm. We should note, that the particle filters are highly prone to include weights which negative influence the distribution. Thus, we keep track of the effective sample size - see Chap. 10 (*A. Gelman, J. Carlin, H. Stern, D. Dunson, A. Vehtari, and D. Rubin, Bayesian
+This formulation completely allows us to ignore the exact form of the original distribution $p(x_{k-1}|z_{1:k-1})$, making the particle an intuitive sampling algorithm. We should note, that the particle filters are highly prone to include weights that negatively influence the distribution. Thus, we keep track of the effective sample size ($S_{eff}$) - see Chap. 10 (*A. Gelman, J. Carlin, H. Stern, D. Dunson, A. Vehtari, and D. Rubin, Bayesian
 Data Analysis, Third Edition (Chapman & Hall/CRC Texts in Statistical Science)
 (Chapman and Hall/CRC), 3rd edn. (2014).*),
 
@@ -173,13 +177,13 @@ S_{eff} = \frac{1}{\sum_{s=1}^S(\tilde{w(\theta^s)})^2}.
 
 ## Algorithmic implementation
 
-We now provide the algorithmic steps, which allows to calculate and update said weights. Assume $p(z_k|x_k)$, $p(z_k|x^s_k)$ and $p(x_k|x_{k-1})$ are given, then at each time-step,
+We now provide algorithmic steps to calculate and update the particle weights. Assume $p(z_k|x_k)$, $p(z_k|x^s_k)$ and $p(x_k|x_{k-1})$ are given, then at each time-step,
 
  * For $s = 1,2, \dots, S$ draw $x_k$,
      \begin{equation}
      x_k \sim p(x_k|x_{k-1}).
      \end{equation}
- * For $s = 1,2, \dots, S$ update weigths $w_k^s$,
+ * For $s = 1,2, \dots, S$ update weights $w_k^s$,
      \begin{equation}
     w^s_k =p(z_{k-1}|x^s_{k-1})\tilde{w_{k-1}}^s.
     \end{equation}
@@ -192,8 +196,8 @@ We now provide the algorithmic steps, which allows to calculate and update said 
      S_{eff} = \frac{1}{\sum_{s=1}^S(\tilde{w(\theta^s)})^2}.
      \end{equation}
  * If $S_{eff} < S_{eff}^{threshold}$ perform resampling:
-     * Choose a resampling method (we choose a stratisfied resampling strategy, as we will touch upon later).
-     * Draw $S$ new particles/samples from the sample population according to their weigths $\tilde{w}_k^s$.
+     * Choose a resampling method (we choose a systematic resampling strategy, as we will touch upon in the next sections).
+     * Draw $S$ new particles/samples from the sample population according to their weights $\tilde{w}_k^s$.
      * Reset all weights as $\tilde{w}_k^s = 1/S$.
  * Compute $p(x_k|z_{1:k-1} )$
      \begin{equation}
@@ -208,7 +212,7 @@ We now provide the algorithmic steps, which allows to calculate and update said 
 
 # Simulation
 
-In order to demonstrate the Monte Carlo localizatin method, a model of a real scenario has to be created in which the simulation takes place.
+In order to demonstrate the Monte Carlo localization method, a model of a real scenario can be created as a setting for the robot localization simulation.
 Therefore, we need to model
 
  * the environment given as a topolgical map
@@ -218,9 +222,9 @@ Therefore, we need to model
 
 ## World model
 
-The world model is generated automatically and is represented by a height map, i.e. a rasterized image is used to represent the elevation at discrete positions.
-The height values are created using a composition of perlin or simplex noise which is often used in computer graphics to create natural landscapes.
-The height values are then mapped to colors for visual purpose only.
+The world model is generated automatically and is represented by an elevation map, i.e. a rasterized image is used to represent the elevation at discrete positions.
+The elevation values are created using a composition of perlin or simplex noise which is often used in computer graphics to create natural landscapes.
+The elevation values are then mapped to colors for visual purpose only.
 The world map is implemented in the file [World.py](http://github.com/Bjarne-AAU/MonteCarloLocalization/blob/master/World.py)
 
 ![A typical map generated by our algorithm.](figures/world_model.png)
@@ -244,13 +248,13 @@ The abstract sensor and noise model are implemented in the file [Sensor.py](http
 In our case, we simulate two kinds of sensors with different noise models:
 
  * Motion sensor: Captures motion of the spacecraft (Odometry/Position)
- * Vision sensor: Captures height of terrain beneath the spacecraft
+ * Vision sensor: Captures terrain's elevation beneath the spacecraft
 
 
 ### Motion Sensor
 
 The motion sensor is used to capture the movement of the spacecraft since the last measurement and is basically just the motion vector between the last and current position.
-The sensor is capable to make observations at a given framerate.
+The sensor is capable of making observations at a given framerate.
 The implementation of the Motion sensor can be found in the file [Motion.py](http://github.com/Bjarne-AAU/MonteCarloLocalization/blob/master/Motion.py).
 
 We simulate two different measurement models: (a) using the motion vector measurements or (b) using the odometry, i.e. independent measurement of the angle and distance of the motion.
@@ -265,9 +269,9 @@ The implementation of the Motion sensor noise can also be found in the file [Mot
 
 ### Vision Sensor
 
-The vision sensor is able to capture the height of the terrain in its view.
+The vision sensor is able to capture the elevation of the terrain in its view.
 The view is determined by the position of the spacecraft and is able to get information about the terrain within a certain range given by a rectangle with a predefined size.
-The sensor is capable to make observations at a given framerate.
+The sensor is capable of making observations at a given framerate.
 The implementation of the Vision sensor can be found in the file [Vision.py](http://github.com/Bjarne-AAU/MonteCarloLocalization/blob/master/Vision.py).
 
 Additionally, we implemented various methods for simulating sensor noise:
@@ -315,19 +319,19 @@ p(z_t | \theta_t) = p(z_t | \theta_t, \mathcal{M}).
 
 In this project, we implemented four different methods to compute the likelihood:
 
-  * Mean absolute difference. It is more suited for the particle-based method as it introduces more noise to the comparison. The mean produces a flatter distribution, which helps to avoid that positions with high similarities are not covered by particles.
+  * Mean absolute difference: it is more suited for the particle-based method as it introduces more noise to the comparison. This metric produces a flatter distribution, which helps capture lower-weight particles that might otherwise be excluded and could lead to sample degenaracy.
   \begin{equation}
   R(x,y) = \sum_{x',y'} |Z(x',y')-M(x+x',y+y')|
   \end{equation}
 
-  * Normalized cross-correlation coefficient. It is better suited for the grid-based method as it finds positions with high similarity.
+  * Normalized cross-correlation coefficient: it is better suited for the grid-based method as it finds positions with high similarity.
   \begin{eqnarray}
   R(x,y) &=& \frac{\sum_{x',y'} (Z(x',y') \cdot M(x+x',y+y'))}{\sqrt{\sum_{x',y'}Z(x',y')^2 \cdot \sum_{x',y'} M(x+x',y+y')^2}} \nonumber \\
   Z'(x',y') &=& Z(x',y') - 1/(w \cdot h) \cdot \sum_{x'',y''} Z(x'',y'') \nonumber \\
   M'(x+x', y+y') &=& M(x+x', y+y') - 1/(w \cdot h) \cdot \sum_{x'',y''} M(x+x'',y+y'')
   \end{eqnarray}
 
-  * Normalized cross-correlation. Similar to the previous method. The main difference is that is not normalized, so it will perform worse when dealing with large values.
+  * Normalized cross-correlation: it is similar to the previous method; the main difference is that is not normalized, so it will perform worse when dealing with large values.
 
   \begin{equation}
   R(x,y)= \frac{ \sum_{x',y'} (Z'(x',y') \cdot M'(x+x',y+y')) }{ \sqrt{\sum_{x',y'}Z'(x',y')^2 \cdot \sum_{x',y'} M'(x+x',y+y')^2} }
@@ -342,7 +346,7 @@ In this project, we implemented four different methods to compute the likelihood
 
 # Respresentations
 
-We approximate the probability distribution (eq. XX) using two methods: grid-based method and particle filter. In grid-based localization (assuming the robot is stationary) the probabilities of all the coordinates in the grid are evaluated. Thus, the robot's belief of its location in the environment is represented by those probabilities. Because all the grid coordinates are evaluated, the grid-based method has less tractable computational properties. That is, the memory requirements and computational time scales with the size and resolution of the environment considered. In our case, we represent the environment as a 2-dimensional x,y coordinate map plus the altitude (i.e. distance between robot and map's surface).
+We approximate the probability distribution (eq. 1) using two methods: grid-based method and particle filter. In grid-based localization (assuming the robot is stationary) the probabilities of all the coordinates in the grid are evaluated. Thus, the robot's belief of its location in the environment is represented by those probabilities. Because all the grid coordinates are evaluated, the grid-based method has less tractable computational properties. That is, the memory requirements and computational time scales with the size and resolution of the environment considered. In our case, we represent the environment as a 2-dimensional x,y coordinate map plus the altitude (i.e. distance between robot and map's surface).
 
 With the particle-filter, the robot's belief is evaluated from randomized weighted samples of its environment (i.e. particles). Therefore, the computational load is more tractable compared to the grid-based method as it scales linearly with the amount of particles employed. However, this comes with the trade-off of less accurate approximations compared to the grid-based method.
 
