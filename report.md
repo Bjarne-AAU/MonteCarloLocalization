@@ -32,8 +32,6 @@ The state space $\Omega$ can be represented by all possible states
 \theta = (x,y) \in \Omega \quad \text{ with } 0 < x < x_{max} \text{ and } 0 < y < y_{max} \nonumber
 \end{equation}
 
-## Test
-
 and our goal is to find a good estimate $\hat{\theta_t}$ of the real state $\theta_t$ at time t.
 We can formulate the belief $Bel(\theta_t)$ of possible states at a time $t$ given the independent observations $z_{0:t}$ and motions $u_{0:t}$ (note that we do not explicitly state the conditioning on $u_{0:t}$ for readability) in a probabilistic manner as
 
@@ -51,7 +49,7 @@ p(z_t | z_{0:t-1}) = \int p(z_t | \theta_t) \ p(\theta_t | z_{0:t-1}) d\theta_t
 and the predictive distribution
 
 \begin{equation}
-p(\theta_t | z_{0:t-1}) = \int p(\theta_t | \theta_{t-1}) \ p(\theta_{t-1} | z_{0:t-1} ) \quad.
+p(\theta_t | z_{0:t-1}) = \int p(\theta_t | \theta_{t-1}) \ p(\theta_{t-1} | z_{0:t-1} ).
 \end{equation}
 
 The system can be fullydetermined by defining the **observation model**
@@ -288,93 +286,57 @@ The implementation of the Vision sensor noise can also be found in the file [Vis
 
 # Motion model
 
-Motion model is used to predict the new position of the density or particles depending on the commands given to the robot. We used two motion models, a naive one and an advanced one.
+Motion model is used to predict the new position of the density or particles depending on the commands given to the robot.
+In particular, the motion model is given by the transition distribution
 
-  * The naive model moves the density or particles based on the motion vector and adds Gaussian noise to this new position.
+\begin{equation}
+p(\theta_t | \theta_{t-1}) = p(\theta_t | \theta_{t-1}, u_t).
+\end{equation}
 
-    ```python
-      def naive(cls, motions, observation):
-      probs = linalg.norm(motions - observation, axis=1)
-      return np.exp(-probs)
-    ```
-  * The advanced model is an odometry-based model. Here, the density or particles are moved based on the rotation and translation of the robot. Then, it is added Gaussian noise to each of these parameters. This model is more accurate, as the robot can have either an error on distance traveled or on the directation that it was facing during the movement. This model follows this conditional probability density
-  \begin{equation}
-  p(x_t|x_{t_1}, u_t)
-  \end{equation}
-  where $x_t$ is the current position, $x_{t-1}$ is the previous position and $u_t$ are the parameters that affects the movement (rotation and translation).
+We implemented two motion models which are based on the motion sensor and its noise:
 
-    ```python
-      def advanced(cls, motions, observation):
-      probs = np.zeros(len(motions))
-
-      mag = np.maximum(linalg.norm(observation), 0.001)
-      mags = linalg.norm(motions, axis=1)
-      indices = mags.nonzero()[0]
-
-      probs += stats.norm.logpdf( mags/mag, 1, cls.level_dist/2.0)
-
-      angles = np.ones(len(motions))
-      angles[indices] = observation.dot(motions[indices,:].T) / (mags[indices] * mag)
-      probs += stats.norm.logpdf(angles, 1, cls.level_rot*cls.level_rot/2.0)
-
-      return np.exp(probs)
-    ```
+  * The first model uses the motion vector itself to propagate the density or particles.
+    The uncertainty of the new position is modeled by adding Gaussian noise to its final position.
+  * The second model uses the odometry measurements to compute a new position.
+    Here, the density or particles are moved based on the rotation and translation of the robot and the uncertainty is modeled independently for the rotation and translation by a Gaussian noise.
 
 ![Distribution of the likely positions for different noise models of the motion sensor. The position after the true motion would be in the center of the image. ](figures/motion_noise.png)
 
+The implementation of the motion model can be found in the file [Motion.py](http://github.com/Bjarne-AAU/MonteCarloLocalization/blob/master/Motion.py).
 
 # Observation model
 
-In the observation model it is calculated the likelihood of being in the center of a map patch $M$ based on the observation $Z$ from the vision sensor. This likelihood can be evaluated using four different methods:
+The observation model is used to compute the similarity between an observation $z$ of the vision sensor and a patch $M$ (of the same size as $z$) in the reference map .
+In particluar, we compute the likelihood given as
 
- * Mean absolute difference. It is more suited for the particle-based method as it introduces more noise to the comparison. The mean produces a flatter distribution, which helps to avoid that positions with high similarities are not covered by particles.
+\begin{equation}
+p(z_t | \theta_t) = p(z_t | \theta_t, \mathcal{M}).
+\end{equation}
 
- 	$$ R(x,y)= \sum_{x',y'} |Z(x',y')-M(x+x',y+y')| $$
+In this project, we implemented four different methods to compute the likelihood:
 
-    Implementation:
-    ```python
-    def ObservationMDIFF(cls, location, world, observation):
-        pos = tuple(location)
-        observation_mean = np.mean(observation)
-        return -np.abs(world[pos] - observation_mean)
-    ```
+  * Mean absolute difference. It is more suited for the particle-based method as it introduces more noise to the comparison. The mean produces a flatter distribution, which helps to avoid that positions with high similarities are not covered by particles.
+  \begin{equation}
+  R(x,y) = \sum_{x',y'} |Z(x',y')-M(x+x',y+y')|
+  \end{equation}
 
- * Normalized cross-correlation coefficient. It is better suited for the grid-based method as it finds positions with high similarity.
+  * Normalized cross-correlation coefficient. It is better suited for the grid-based method as it finds positions with high similarity.
+  \begin{eqnarray}
+  R(x,y) &=& \frac{\sum_{x',y'} (Z(x',y') \cdot M(x+x',y+y'))}{\sqrt{\sum_{x',y'}Z(x',y')^2 \cdot \sum_{x',y'} M(x+x',y+y')^2}} \nonumber \\
+  Z'(x',y') &=& Z(x',y') - 1/(w \cdot h) \cdot \sum_{x'',y''} Z(x'',y'') \nonumber \\
+  M'(x+x', y+y') &=& M(x+x', y+y') - 1/(w \cdot h) \cdot \sum_{x'',y''} M(x+x'',y+y'')
+  \end{eqnarray}
 
-    $$ \begin{array}{l} Z'(x',y')=Z(x',y') - 1/(w \cdot h) \cdot \sum _{x'',y''} Z(x'',y'') \\ M'(x+x',y+y')=M(x+x',y+y') - 1/(w \cdot h) \cdot \sum _{x'',y''} M(x+x'',y+y'') \end{array} $$
+  * Normalized cross-correlation. Similar to the previous method. The main difference is that is not normalized, so it will perform worse when dealing with large values.
 
- 	$$ R(x,y)= \frac{\sum_{x',y'} (Z(x',y') \cdot M(x+x',y+y'))}{\sqrt{\sum_{x',y'}Z(x',y')^2 \cdot \sum_{x',y'} M(x+x',y+y')^2}} $$
-
-    Implementation:
-    ```python
-    def ObservationCCOEFF(cls, location, world, observation):
-        model = cls._extract_location(location, observation.shape, world)
-        norm = np.sqrt(np.sum(model*model) * np.sum(observation*observation))
-        return np.sum( (model - np.mean(model)) * (observation - np.mean(observation)) ) / norm
-    ```
- * Normalized cross-correlation. Similar to the previous method. The main difference is that is not normalized, so it will perform worse when dealing with large values.
-
- 	$$ R(x,y)= \frac{ \sum_{x',y'} (Z'(x',y') \cdot M'(x+x',y+y')) }{ \sqrt{\sum_{x',y'}Z'(x',y')^2 \cdot \sum_{x',y'} M'(x+x',y+y')^2} } $$
-
-    Implementation:
-    ```python
-    def ObservationCCORR(cls, location, world, observation):
-        model = cls._extract_location(location, observation.shape, world)
-        norm = np.sqrt(np.sum(model*model) * np.sum(observation*observation))
-        return np.sum( model * observation ) / norm
-    ```
+  \begin{equation}
+  R(x,y)= \frac{ \sum_{x',y'} (Z'(x',y') \cdot M'(x+x',y+y')) }{ \sqrt{\sum_{x',y'}Z'(x',y')^2 \cdot \sum_{x',y'} M'(x+x',y+y')^2} }
+  \end{equation}
 
  * Mean squared difference. It is a good compromise in performance for the grid-based and particle-based method.
-
- 	$$ R(x,y)= \sum_{x',y'} (Z(x',y')-M(x+x',y+y'))^2 $$
-
-    Implementation:
-    ```python
-    def ObservationSQDIFF(cls, location, world, observation):
-        model = cls._extract_location(location, observation.shape, world)
-        diff = observation - model
-        return -np.sum(diff*diff)
-    ```
+  \begin{equation}
+  R(x,y)= \sum_{x',y'} (Z(x',y')-M(x+x',y+y'))^2
+  \end{equation}
 
 
 
