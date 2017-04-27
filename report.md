@@ -76,7 +76,7 @@ or the Maximum A-Posteriori estimate (or the maximum mode)
 
 # Derivation of sequential Bayes filter
 
-We shall in this section derive and formulate the *Recursive Bayesian Estimation* or Bayes Filter. The purpose is to lay the foundation for the application known as particle filtering. Specifically, we will use the *Sequential Importance Resampling* (SIR). Of those algorithms associated with SIR we utilize the special case known as *Bootstrap filter*. We generalize the notation for the derivation of SIR. 
+We shall in this section derive and formulate the *Recursive Bayesian Estimation* or Bayes Filter. The purpose is to lay the foundation for the application known as particle filtering. Specifically, we will use the *Sequential Importance Resampling* (SIR). Of those algorithms associated with SIR we utilize the special case known as *Bootstrap filter*. We generalize the notation for the derivation of SIR.
 
 ## Bayesian Network of The Hidden Markov Model (HMM)
 
@@ -112,7 +112,7 @@ As we shall see later, we explicitly model $p(z_k|x_k)$, thus leaving us to refo
 
 \begin{align}
 p(x_k|z_{1:k-1} ) &= \int \frac{p(x_k,x_{k-1},z_{1:k-1} )}{p(z_{1:k})}dx_{k-1} \nonumber \\
-&= \int \frac{p(x_k|x_{k-1})p(z_{1:k-1} | x_{k-1} ) p(x_{k-1})}{p(z_{1:k})}dx_{k-1}\nonumber\\ 
+&= \int \frac{p(x_k|x_{k-1})p(z_{1:k-1} | x_{k-1} ) p(x_{k-1})}{p(z_{1:k})}dx_{k-1}\nonumber\\
 &=\int p(x_k|x_{k-1})p( x_{k-1} | z_{1:k-1})dx_{k-1},
 \end{align}
 where we further utilized the following assumption
@@ -142,7 +142,7 @@ It turns out that a proper choice of proposal distribution from which $x_{k-1}$ 
 where $\alpha = k-1$ and any approximate equalities have been substituted with strict equalities for brevity. Using the above equation and dropping the parameter dependencies for the weights, we find,
 
 \begin{equation}
-w^s_k = \frac{p( x_{\alpha}^s | z_{1:\alpha})}{\pi(\theta^s)}\propto \frac{p(z_\alpha|x^s_\alpha)\sum_{l=1}^L p(x_\alpha^s|x_{\alpha-1}^l)\tilde{w_\alpha}^l}{\pi(\theta^s)}.
+w^s_k = \frac{p( x_{\alpha}^s | z_{1:\alpha})}{\pi(\theta^s)}\propto \frac{p(z_\alpha|x^s_\alpha)\sum_{l=1}^L p(x_\alpha^s|x_{\alpha-1}^l)\tilde{w}_\alpha^l}{\pi(\theta^s)}.
 \end{equation}
 
 Clearly, weights at subsequent time-steps depend sequentially on immediate previous weights. However, it would perhaps seem computationally disadvantageous to sample $S$ samples, for each we need to calculates probabilities through a sum of previous $L$ samples. To make further simplifications, we turn to particle filtering.
@@ -152,7 +152,7 @@ Clearly, weights at subsequent time-steps depend sequentially on immediate previ
 Particle filters rely on the simple concept assigning each weight to a unique particle. We formulate this mathematically as the set of $S$ samples,
 
 \begin{equation}
-    \{x_k^s,\tilde{w_k}^s~|~s = 1,2,\dots,S\}.
+    \{x_k^s,\tilde{w}_k^s~|~s = 1,2,\dots,S\}.
 \end{equation}
 
 The fundamental idea is, that for each time step we keep our samples/particles, but update their weights. We formualte this as,
@@ -191,7 +191,7 @@ We now provide algorithmic steps to calculate and update the particle weights. A
      \end{equation}
  * For $s = 1,2, \dots, S$ update weights $w_k^s$,
      \begin{equation}
-    w^s_k =p(z_{k}|x^s_{k})\tilde{w_{k-1}}^s.
+    w^s_k =p(z_{k}|x^s_{k})\tilde{w}_{k-1}^s.
     \end{equation}
  *  For $s = 1,2, \dots, S$ normalize the weights,
      \begin{equation}
@@ -199,16 +199,15 @@ We now provide algorithmic steps to calculate and update the particle weights. A
      \end{equation}
  * Compute the effective sample size
      \begin{equation}
-     S_{eff} = \frac{1}{\sum_{s=1}^S(\tilde{w}(\theta^s))^2.
+     S_{eff} = \frac{1}{\sum_{s=1}^S(\tilde{w}(\theta^s))^2}.
      \end{equation}
  * If $S_{eff} < S_{eff}^{threshold}$ perform resampling:
      * Choose a resampling method (we choose a systematic resampling strategy, as we will touch upon in the next sections).
      * Draw $S$ new particles/samples from the sample population according to their weights $\tilde{w}_k^s$.
      * Reset all weights as $\tilde{w}_k^s = 1/S$.
-<!-- 
+
+<!--
 This step computes distribution of ROBOT'S state.
-
-
 
 * Compute $p(x_k|z_{1:k-1} )$
      \begin{equation}
