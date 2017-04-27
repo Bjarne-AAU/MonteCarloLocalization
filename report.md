@@ -342,12 +342,25 @@ In this project, we implemented four different methods to compute the likelihood
 
 # Respresentations
 
-We approximate the probability distribution (eq. XX) using two methods: grid-based method and particle filter. In grid-based localization (assuming the robot is stationary) the probabilities of all the coordinates in the grid are evaluated. Thus, the robot's belief of its location in the environment is represented by those probabilities. Because all the grid coordinates are evaluated, the grid-based method has less tractable computational properties. That is, the memory requirements and computational time scales with the size and resolution of the environment considered. In our case, we represent the environment as a 2-dimensional x,y coordinate map plus the altitude (i.e. distance between robot and map's surface).
+We approximate the posterior distribution $p(\theta_t | z_{0:t})$ using two methods: grid-based method and particle filter.
 
-With the particle-filter, the robot's belief is evaluated from randomized weighted samples of its environment (i.e. particles). Therefore, the computational load is more tractable compared to the grid-based method as it scales linearly with the amount of particles employed. However, this comes with the trade-off of less accurate approximations compared to the grid-based method.
+## Grid-based approximation
+The grid-based localization approximates the posterior distribution by dividing the continuous state space into a discrete grid.
+Each cell in the grid has a probability (or weight) assigned to it that represents the belief of being the true locations.
+Based on the spacecraft's movement, these probabilities have to be propagated on the grid using our motion model and then corrected according to our observation model.
 
-PROPAGATING DENSITIES PART GOES HERE: In essence, the difference between these two methods during the recursive steps can be thought of as in one the probability densities are propagated from the previous state to the current state (grid-based), whereas in the other the pdf is ... (I don't know what I'm talking about...lol)
+An advantage of the grid-based approach is that it can accurately model the distribution given a high resolution of the grid.
+However, since there is only one true state, the posterior tends to be very sparse, i.e. most of the cells in the grid only have a very low probability assigned to it.
+Especially in higher dimensional space, this leads to a system where most of the computational power is wasted by comparing unlikely map patches with the observation.
 
+## Particle-based approximation
+
+In order to reduce the computational overhead created by the grid-based method, the particle-based filter has become popular.
+Similar to the grid-based methods, the posterior distribution is approximated at certain locations, in this case given by a set of particles which represent possible locations of the spacecraft.
+Instead of having an evenly divided grid, the particles are drawn from the posterior distribution itself such that they accumulate at the modes of the distribution (or to be more precise: they are propagated towards the modes).
+We therefore only compare the observation with relevant map patches, thus representing the distribution with less particles and consequently reducing the computational cost.
+
+Even though the particle filter makes the computation and estimation much more efficient, it comes with the trade-off of less accurate approximations compared to the grid-based method.
 
 
 ## Resampling Methods
