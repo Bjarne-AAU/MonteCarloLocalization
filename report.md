@@ -50,7 +50,7 @@ p(z_t | z_{0:t-1}) = \int p(z_t | \theta_t) \ p(\theta_t | z_{0:t-1}) d\theta_t
 and the predictive distribution
 
 \begin{equation}
-p(\theta_t | z_{0:t-1}) = \int p(\theta_t | \theta_{t-1}) \ p(\theta_{t-1} | z_{0:t-1} ).
+p(\theta_t | z_{0:t-1}) = \int p(\theta_t | \theta_{t-1}) \ p(\theta_{t-1} | z_{0:t-1} )d\theta_{t-1}.
 \end{equation}
 
 The system can be fully determined by defining the **observation model**
@@ -115,7 +115,7 @@ p(x_k|z_{1:k-1} ) &= \int \frac{p(x_k,x_{k-1},z_{1:k-1} )}{p(z_{1:k})}dx_{k-1} \
 &= \int \frac{p(x_k|x_{k-1})p(z_{1:k-1} | x_{k-1} ) p(x_{k-1})}{p(z_{1:k})}dx_{k-1}\nonumber\\ 
 &=\int p(x_k|x_{k-1})p( x_{k-1} | z_{1:k-1})dx_{k-1},
 \end{align}
-where we further utilize the following assumption
+where we further utilized the following assumption
 
 \begin{equation}
 p(x_k,z_{1:k-1}|x_{k-1}) = p(x_k|x_{k-1})p(z_{1:k-1} | x_{k-1} ).
@@ -126,17 +126,17 @@ Data Analysis, Third Edition (Chapman & Hall/CRC Texts in Statistical Science)
 (Chapman and Hall/CRC), 3rd edn. (2014).*), we can estimate the aforementioned expected value through importance sampling, as sampling $x_{k-1}$ in it's current form is non-trivial. Hence, by denoting a proposal distribution as $\pi(\theta)$, where $\theta$ denotes all relevant parameters associated with the HMM model, we write,
 
 \begin{equation}
-p(x_k|z_{1:k-1} ) \simeq \sum_{s=1}^S p(x_k|x_{k-1}^s)\tilde{w(\theta)^s},
+p(x_k|z_{1:k-1} ) \simeq \frac{1}{S} \sum_{s=1}^S p(x_k|x_{k-1}^s)\tilde{w(\theta^s)},
 \end{equation}
 where $\theta^s$ denotes all relevant paramters but explicitly a sample $x_{k-1}^s$, and
 \begin{equation}
-\tilde{w(\theta)}^s = \frac{w(\theta^s)}{\sum_{s=1}^S w(\theta^s)}, \quad \text{with} \quad w(\theta^s) = \frac{p( x_{k-1}^s | z_{1:k-1})}{\pi(\theta^s)}.
+\tilde{w}(\theta^s) = \frac{w(\theta^s)}{\sum_{s=1}^S w(\theta^s)}, \quad \text{with} \quad w(\theta^s) = \frac{p( x_{k-1}^s | z_{1:k-1})}{\pi(\theta^s)}.
 \end{equation}
 
 It turns out that a proper choice of proposal distribution from which $x_{k-1}$ is easily sampled, significantly simplifies the posterior estimation, as we will now show,
 
 \begin{equation}
-    p(x_{k-1}|z_{1:k-1}) \propto p(z_{\alpha}|x_{\alpha})p(x_{\alpha}|z_{\alpha-1}) = \sum_{s=1}^Sp(z_\alpha|x_\alpha)p(x_\alpha|x_{\alpha-1}^s)\tilde{w_\alpha(\theta^s)},
+    p(x_{k-1}|z_{1:k-1}) \propto p(z_{\alpha}|x_{\alpha})p(x_{\alpha}|z_{\alpha-1}) = \sum_{s=1}^Sp(z_\alpha|x_\alpha)p(x_\alpha|x_{\alpha-1}^s)\tilde{w}_\alpha(\theta^s),
 \end{equation}
 
 where $\alpha = k-1$ and any approximate equalities have been substituted with strict equalities for brevity. Using the above equation and dropping the parameter dependencies for the weights, we find,
@@ -164,13 +164,13 @@ The fundamental idea is, that for each time step we keep our samples/particles, 
 Consequently, we still draw samples, but the net effect is that each sample is simply updated, and one can keep track of each sample/particle's weights development through a sequence. Armed with the particle formulation, we simplify the weights' update as follows:
 
 \begin{equation}
-w^s_k = \frac{p( x_{\alpha}^s | z_{1:\alpha})}{\pi(\theta^s)} \propto \frac{p(z_\alpha|x^s_\alpha) p(x_\alpha^s|x_{\alpha-1}^s)\tilde{w_{k-1}}^s}{\pi(\theta^s)}.
+w^s_k = \frac{p( x_{\alpha}^s | z_{1:\alpha})}{\pi(\theta^s)} \propto \frac{p(z_\alpha|x^s_\alpha) p(x_\alpha^s|x_{\alpha-1}^s)\tilde{w}_{\alpha}^s}{\pi(\theta^s)}.
 \end{equation}
 
 By choosing $\pi(\theta^s) = p(x_\alpha^s|x_{\alpha-1}^s)$, we arrive at the bootstrap filter, where each weight is updated as:
 
 \begin{equation}
-w^s_k =p(z_{k-1}|x^s_{k-1})\tilde{w_{k-1}}^s.
+w^s_k =p(z_{k-1}|x^s_{k-1})\tilde{w}_{k-1}^s.
 \end{equation}
 
 This formulation completely allows us to ignore the exact form of the original distribution $p(x_{k-1}|z_{1:k-1})$, making the particle an intuitive sampling algorithm. We should note, that the particle filters are highly prone to include weights that negatively influence the distribution. Thus, we keep track of the effective sample size ($S_{eff}$) - see Chap. 10 (*A. Gelman, J. Carlin, H. Stern, D. Dunson, A. Vehtari, and D. Rubin, Bayesian
@@ -187,11 +187,11 @@ We now provide algorithmic steps to calculate and update the particle weights. A
 
  * For $s = 1,2, \dots, S$ draw $x_k$,
      \begin{equation}
-     x_k \sim p(x_k|x_{k-1}).
+     x^s_k \sim p(x^s_k|x^s_{k-1}).
      \end{equation}
  * For $s = 1,2, \dots, S$ update weights $w_k^s$,
      \begin{equation}
-    w^s_k =p(z_{k-1}|x^s_{k-1})\tilde{w_{k-1}}^s.
+    w^s_k =p(z_{k}|x^s_{k})\tilde{w_{k-1}}^s.
     \end{equation}
  *  For $s = 1,2, \dots, S$ normalize the weights,
      \begin{equation}
@@ -199,21 +199,26 @@ We now provide algorithmic steps to calculate and update the particle weights. A
      \end{equation}
  * Compute the effective sample size
      \begin{equation}
-     S_{eff} = \frac{1}{\sum_{s=1}^S(\tilde{w(\theta^s)})^2}.
+     S_{eff} = \frac{1}{\sum_{s=1}^S(\tilde{w}(\theta^s))^2.
      \end{equation}
  * If $S_{eff} < S_{eff}^{threshold}$ perform resampling:
      * Choose a resampling method (we choose a systematic resampling strategy, as we will touch upon in the next sections).
      * Draw $S$ new particles/samples from the sample population according to their weights $\tilde{w}_k^s$.
      * Reset all weights as $\tilde{w}_k^s = 1/S$.
- * Compute $p(x_k|z_{1:k-1} )$
+<!-- 
+This step computes distribution of ROBOT'S state.
+
+
+
+* Compute $p(x_k|z_{1:k-1} )$
      \begin{equation}
-    p(x_k|z_{1:k-1} ) \simeq \sum_{s=1}^S p(x_k|x_{k-1}^s)\tilde{w(\theta)^s},
+    p(x_k|z_{1:k-1} ) \simeq \frac{1}{S}\sum_{s=1}^S p(x_k|x_{k-1}^s)\tilde{w}(\theta)^s,
     \end{equation}
  * Compute $p(x_k|z_{1:k})$,
      \begin{equation}
         p(x_k|z_{1:k}) \propto p(z_k|x_k)p(x_k|z_{1:k-1} ).
     \end{equation}
-
+-->
 
 
 # Simulation
