@@ -74,11 +74,11 @@ or the Maximum A-Posteriori estimate (or the maximum mode)
 \end{equation}
 
 
-# Derivation of sequential Bayes filter
+# Derivation of Sequential Bayes filter
 
-We shall in this section derive and formulate the *Recursive Bayesian Estimation* or Bayes Filter. The purpose is to lay the foundation for the application known as particle filtering. Specifically, we will use the *Sequential Importance Resampling* (SIR). Of those algorithms associated with SIR we utilize the special case known as *Bootstrap filter*. We generalize the notation for the derivation of SIR.
+In this section, we will derive and formulate the *Recursive Bayesian Estimation* or Bayes Filter. The purpose is to lay the foundation for the application known as particle filtering. Specifically, we will use the *Sequential Importance Resampling* (SIR). Of those algorithms associated with SIR we utilize the special case known as *Bootstrap filter*. We generalize the notation for the derivation of SIR.
 
-## Bayesian Network of The Hidden Markov Model (HMM)
+## Bayesian Network of the Hidden Markov Model (HMM)
 
 Using HMM and denoting a time-step as $k$, we will infer the probability of a current true state, denoted $x_k$, conditioned on all previous hidden and (including the current) observed  states, which we denote $x_{1:k-1}$ and $z_{1:k}$ respectively. For HMM, we make the following assumption about any time sequence:
 
@@ -121,12 +121,15 @@ where we further utilized the following assumption
 p(x_k,z_{1:k-1}|x_{k-1}) = p(x_k|x_{k-1})p(z_{1:k-1} | x_{k-1} ).
 \end{equation}
 
+
+## Grid-based approximation
+
 We then identify the previous equation as an average of $p(x_k|x_{k-1})$ over the conditional probability density of $x_{k-1}$. Thus, referring to Chap. 10 (*A. Gelman, J. Carlin, H. Stern, D. Dunson, A. Vehtari, and D. Rubin, Bayesian
 Data Analysis, Third Edition (Chapman & Hall/CRC Texts in Statistical Science)
-(Chapman and Hall/CRC), 3rd edn. (2014).*), we can estimate the aforementioned expected value through importance sampling, as sampling $x_{k-1}$ in it's current form is non-trivial. Hence, by denoting a proposal distribution as $\pi(\theta)$, where $\theta$ denotes all relevant parameters associated with the HMM model, we write,
+(Chapman and Hall/CRC), 3rd edn. (2014).*), we can estimate the aforementioned expected value through importance sampling, as sampling $x_{k-1}$ in its current form is non-trivial. Hence, by denoting a proposal distribution as $\pi(\theta)$, where $\theta$ denotes all relevant parameters associated with the HMM model, we write,
 
 \begin{equation}
-p(x_k|z_{1:k-1} ) \simeq \frac{1}{S} \sum_{s=1}^S p(x_k|x_{k-1}^s)\tilde{w(\theta^s)},
+p(x_k|z_{1:k-1} ) \simeq \frac{1}{S} \sum_{s=1}^S p(x_k|x_{k-1}^s)\tilde{w}(\theta^s),
 \end{equation}
 where $\theta^s$ denotes all relevant paramters but explicitly a sample $x_{k-1}^s$, and
 \begin{equation}
@@ -185,7 +188,7 @@ S_{eff} = \frac{1}{\sum_{s=1}^S(\tilde{w(\theta^s)})^2}.
 
 We now provide algorithmic steps to calculate and update the particle weights. Assume $p(z_k|x_k)$, $p(z_k|x^s_k)$ and $p(x_k|x_{k-1})$ are given, then at each time-step,
 
- * For $s = 1,2, \dots, S$ draw $x_k$,
+ * For $s = 1,2, \dots, S$ draw $x_k$ (by propagating $x_{k-1}$ with the transition kernel),
      \begin{equation}
      x^s_k \sim p(x^s_k|x^s_{k-1}).
      \end{equation}
@@ -329,25 +332,25 @@ p(z_t | \theta_t) = p(z_t | \theta_t, \mathcal{M}).
 
 In this project, we implemented four different methods to compute the likelihood:
 
-  * Mean absolute difference: it is more suited for the particle-based method as it introduces more noise to the comparison. This metric produces a flatter distribution, which helps capture lower-weight particles that might otherwise be excluded and could lead to sample degenaracy.
+  * Absolute mean difference: it is more suited for the particle-based method as it introduces more noise in comparison to the other methods. This metric thus produces a flatter distribution which helps capturing lower-weight particles that might otherwise be excluded and could lead to sample degenaracy or impoverishment.
   \begin{equation}
   R(x,y) = \sum_{x',y'} |Z(x',y')-M(x+x',y+y')|
   \end{equation}
 
-  * Normalized cross-correlation coefficient: it is better suited for the grid-based method as it finds positions with high similarity.
+  * Normalized cross-correlation coefficient: it is better suited for the grid-based method as the metric is usally creates a distribution with steep modes which are prone to be "overlooked" by the particle-based method.
   \begin{eqnarray}
   R(x,y) &=& \frac{\sum_{x',y'} (Z(x',y') \cdot M(x+x',y+y'))}{\sqrt{\sum_{x',y'}Z(x',y')^2 \cdot \sum_{x',y'} M(x+x',y+y')^2}} \nonumber \\
   Z'(x',y') &=& Z(x',y') - 1/(w \cdot h) \cdot \sum_{x'',y''} Z(x'',y'') \nonumber \\
   M'(x+x', y+y') &=& M(x+x', y+y') - 1/(w \cdot h) \cdot \sum_{x'',y''} M(x+x'',y+y'')
   \end{eqnarray}
 
-  * Normalized cross-correlation: it is similar to the previous method; the main difference is that is not normalized, so it will perform worse when dealing with large values.
+  * Normalized cross-correlation: it is similar to the previous method; the main difference is that is not centered and it therefore dependend on the absolute values themselves, i.e. higher values result in a higher probability.
 
   \begin{equation}
   R(x,y)= \frac{ \sum_{x',y'} (Z'(x',y') \cdot M'(x+x',y+y')) }{ \sqrt{\sum_{x',y'}Z'(x',y')^2 \cdot \sum_{x',y'} M'(x+x',y+y')^2} }
   \end{equation}
 
- * Mean squared difference. It is a good compromise in performance for the grid-based and particle-based method.
+ * Mean squared difference: it is a good compromise in terms of performance for the grid-based and particle-based method similar to the absolute mean difference.
   \begin{equation}
   R(x,y)= \sum_{x',y'} (Z(x',y')-M(x+x',y+y'))^2
   \end{equation}
@@ -362,7 +365,7 @@ We approximate the posterior distribution $p(\theta_t | z_{0:t})$ using two meth
 ## Grid-based approximation
 The grid-based localization approximates the posterior distribution by dividing the continuous state space into a discrete grid.
 Each cell in the grid has a probability (or weight) assigned to it that represents the belief of being the true locations.
-Based on the spacecraft's movement, these probabilities have to be propagated on the grid using our motion model and then corrected according to our observation model.
+Based on the spacecraft's movement, these probabilities have to be propagated on the grid using our motion model and then corrected according to the observation model.
 
 An advantage of the grid-based approach is that it can accurately model the distribution given a high resolution of the grid.
 However, since there is only one true state, the posterior tends to be very sparse, i.e. most of the cells in the grid only have a very low probability assigned to it.
