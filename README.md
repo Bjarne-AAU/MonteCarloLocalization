@@ -17,4 +17,10 @@ Libraries can be installed via pip.
  * opencv-python [2.4.8]: http://opencv.org
 
 
+## Executing the application
 
+Run the file localization.py with python:
+
+```python
+python localization.py
+```

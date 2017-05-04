@@ -355,12 +355,13 @@ In this project, we implemented four different methods to compute the likelihood
   R(x,y)= \sum_{x',y'} (Z(x',y')-M(x+x',y+y'))^2
   \end{equation}
 
-
+The implementation of the observation models can be found in the file [Vision.py](http://github.com/Bjarne-AAU/MonteCarloLocalization/blob/master/Vision.py).
 
 # Respresentations
 
 
 We approximate the posterior distribution $p(\theta_t | z_{0:t})$ using two methods: grid-based method and particle filter.
+The implementation for both methods can be found in the file [Representation.py](http://github.com/Bjarne-AAU/MonteCarloLocalization/blob/master/Representation.py).
 
 ## Grid-based approximation
 The grid-based localization approximates the posterior distribution by dividing the continuous state space into a discrete grid.
