@@ -61,7 +61,7 @@ given the last estimated location $\theta_{t-1}$ and the observed motion $u_t$.
 
 However, the integrals of the normalization term and the predictive distribution cannot be determined analytically and have to be solved using the Monte Carlo integration method.
 With the Monte Carlo representation of the posterior distribution, we are able to estimate the true state of the spacecraft with respect to any criterion.
-Typical estimates are the Minimum Mean Square Estimate (or the expectated value)
+Typical estimates are the Minimum Mean Square Estimate (or the expected value)
 
 \begin{equation}
 \hat{\theta}_t^{\scriptscriptstyle{\text{MMS}}} = E[\theta_t | z_{0:t}] = \int \theta_t p(\theta_t | z_{0:t}) d\theta_t
@@ -131,7 +131,7 @@ Data Analysis, Third Edition (Chapman & Hall/CRC Texts in Statistical Science)
 \begin{equation}
 p(x_k|z_{1:k-1} ) \simeq \frac{1}{S} \sum_{s=1}^S p(x_k|x_{k-1}^s)\tilde{w}(\theta^s),
 \end{equation}
-where $\theta^s$ denotes all relevant paramters but explicitly a sample $x_{k-1}^s$, and
+where $\theta^s$ denotes all relevant parameters but explicitly a sample $x_{k-1}^s$, and
 \begin{equation}
 \tilde{w}(\theta^s) = \frac{w(\theta^s)}{\sum_{s=1}^S w(\theta^s)}, \quad \text{with} \quad w(\theta^s) = \frac{p( x_{k-1}^s | z_{1:k-1})}{\pi(\theta^s)}.
 \end{equation}
@@ -158,7 +158,7 @@ Particle filters rely on the simple concept assigning each weight to a unique pa
     \{x_k^s,\tilde{w}_k^s~|~s = 1,2,\dots,S\}.
 \end{equation}
 
-The fundamental idea is, that for each time step we keep our samples/particles, but update their weights. We formualte this as,
+The fundamental idea is, that for each time step we keep our samples/particles, but update their weights. We formulate this as,
 
 \begin{equation}
     p(x_k^s|x_\alpha^l) = \begin{cases} p(x_k^s|x_\alpha^s) & s =l \\ 0 & \text{otherwise} \end{cases}.
@@ -228,7 +228,7 @@ This step computes distribution of ROBOT'S state.
 In order to demonstrate the Monte Carlo localization method, a model of a real scenario can be created as a setting for the robot localization simulation.
 Therefore, we need to model
 
- * the environment given as a topolgical map
+ * the environment given as a topological map
  * the spacecraft which is able to navigate around the map
  * the sensors used by the spacecraft to make observations
 
@@ -313,7 +313,7 @@ p(\theta_t | \theta_{t-1}) = p(\theta_t | \theta_{t-1}, u_t).
 We implemented two motion models which are based on the motion sensor and its noise:
 
   * The first model uses the motion vector itself to propagate the density or particles.
-    The uncertainty of the new position is modeled by adding Gaussian noise to its final position.
+    The uncertainty of the new position is modelled by adding Gaussian noise to its final position.
   * The second model uses the odometry measurements to compute a new position.
     Here, the density or particles are moved based on the rotation and translation of the robot and the uncertainty is modeled independently for the rotation and translation by a Gaussian noise.
 
@@ -324,7 +324,7 @@ The implementation of the motion model can be found in the file [Motion.py](http
 # Observation model
 
 The observation model is used to compute the similarity between an observation $z$ of the vision sensor and a patch $M$ (of the same size as $z$) in the reference map .
-In particluar, we compute the likelihood given as
+In particular, we compute the likelihood given as
 
 \begin{equation}
 p(z_t | \theta_t) = p(z_t | \theta_t, \mathcal{M}).
@@ -332,19 +332,19 @@ p(z_t | \theta_t) = p(z_t | \theta_t, \mathcal{M}).
 
 In this project, we implemented four different methods to compute the likelihood:
 
-  * Absolute mean difference: it is more suited for the particle-based method as it introduces more noise in comparison to the other methods. This metric thus produces a flatter distribution which helps capturing lower-weight particles that might otherwise be excluded and could lead to sample degenaracy or impoverishment.
+  * Absolute mean difference: it is more suited for the particle-based method as it introduces more noise in comparison to the other methods. This metric thus produces a flatter distribution which helps capturing lower-weight particles that might otherwise be excluded and could lead to sample degeneracy or impoverishment.
   \begin{equation}
   R(x,y) = \sum_{x',y'} |Z(x',y')-M(x+x',y+y')|
   \end{equation}
 
-  * Normalized cross-correlation coefficient: it is better suited for the grid-based method as the metric is usally creates a distribution with steep modes which are prone to be "overlooked" by the particle-based method.
+  * Normalized cross-correlation coefficient: it is better suited for the grid-based method as the metric is usually creates a distribution with steep modes which are prone to be "overlooked" by the particle-based method.
   \begin{eqnarray}
   R(x,y) &=& \frac{\sum_{x',y'} (Z(x',y') \cdot M(x+x',y+y'))}{\sqrt{\sum_{x',y'}Z(x',y')^2 \cdot \sum_{x',y'} M(x+x',y+y')^2}} \nonumber \\
   Z'(x',y') &=& Z(x',y') - 1/(w \cdot h) \cdot \sum_{x'',y''} Z(x'',y'') \nonumber \\
   M'(x+x', y+y') &=& M(x+x', y+y') - 1/(w \cdot h) \cdot \sum_{x'',y''} M(x+x'',y+y'')
   \end{eqnarray}
 
-  * Normalized cross-correlation: it is similar to the previous method; the main difference is that is not centered and it therefore dependend on the absolute values themselves, i.e. higher values result in a higher probability.
+  * Normalized cross-correlation: it is similar to the previous method; the main difference is that is not centered and it therefore dependent on the absolute values themselves, i.e. higher values result in a higher probability.
 
   \begin{equation}
   R(x,y)= \frac{ \sum_{x',y'} (Z'(x',y') \cdot M'(x+x',y+y')) }{ \sqrt{\sum_{x',y'}Z'(x',y')^2 \cdot \sum_{x',y'} M'(x+x',y+y')^2} }
@@ -413,12 +413,12 @@ def resample_stratified(self):
         self._resample_indices(positions)
 ```
 
-However, this introduces a new problem - sample impoverishment - whereby with each iteration our sample becomes more and more highly concentrated with particles originating from large weight particles. That is, since large weight particles are more likely to be drawn, it can be seen that with each resampling step, we gradually reduce the diversity of the particles. In a worst case scenario (in the limit) of sample impoverishement, we would end up with a sample whose particles originated from one particle of large weight, which would result in (poorly) approximating our probability distribution with only one point estimate. We combat this by resampling only when the effective sample size ($S_eff$ is set to 0.5 here) threshold is reached.  In this manner, we slow down the process of sample impoverishement.
+However, this introduces a new problem - sample impoverishment - whereby with each iteration our sample becomes more and more highly concentrated with particles originating from large weight particles. That is, since large weight particles are more likely to be drawn, it can be seen that with each resampling step, we gradually reduce the diversity of the particles. In a worst case scenario (in the limit) of sample impoverishment, we would end up with a sample whose particles originated from one particle of large weight, which would result in (poorly) approximating our probability distribution with only one point estimate. We combat this by resampling only when the effective sample size ($S_eff$ is set to 0.5 here) threshold is reached.  In this manner, we slow down the process of sample impoverishment.
 
 
 ### Systematic Sampling
 
-Similar to stratified sampling, we divide the sampling space into $N$ equal groups, except that instead of each group's draw being independent of eachother, in systematic sampling the position of a draw is the same in each group. Therefore, the draws in each group are equally spaced.
+Similar to stratified sampling, we divide the sampling space into $N$ equal groups, except that instead of each group's draw being independent of each other, in systematic sampling the position of a draw is the same in each group. Therefore, the draws in each group are equally spaced.
 
 ```python
 def resample_systematic(self):
