@@ -122,61 +122,122 @@ p(x_k,z_{1:k-1}|x_{k-1}) = p(x_k|x_{k-1})p(z_{1:k-1} | x_{k-1} ).
 \end{equation}
 
 
-## Grid-based approximation
+# Derivation of Sequential Bayes filter
 
-We then identify the previous equation as an average of $p(x_k|x_{k-1})$ over the conditional probability density of $x_{k-1}$. Thus, referring to Chap. 10 (*A. Gelman, J. Carlin, H. Stern, D. Dunson, A. Vehtari, and D. Rubin, Bayesian
-Data Analysis, Third Edition (Chapman & Hall/CRC Texts in Statistical Science)
-(Chapman and Hall/CRC), 3rd edn. (2014).*), we can estimate the aforementioned expected value through importance sampling, as sampling $x_{k-1}$ in its current form is non-trivial. Hence, by denoting a proposal distribution as $\pi(\theta)$, where $\theta$ denotes all relevant parameters associated with the HMM model, we write,
+In this section, we will derive and formulate the *Recursive Bayesian Estimation* or Bayes Filter. The purpose is to lay the foundation for the application known as particle filtering and also the grid-based method. Specifically, we will use the *Sequential Importance Resampling* (SIR). Of those algorithms associated with SIR we utilize the special case known as *Bootstrap filter*. We generalize the notation for the derivation of SIR, and refer to a tutorial for particle filters, (*M. S. Arulampalam, S. Maskell, and N. Gordon, A tutorial on particle filters for online
+nonlinear/non-gaussian bayesian tracking. IEEE Transactions on Signal Processing
+174–188 (2002)*), for a more general and detailed derivation than presented here. This section is mainly inspired by said tutorial.
 
-\begin{equation}
-p(x_k|z_{1:k-1} ) \simeq \frac{1}{S} \sum_{s=1}^S p(x_k|x_{k-1}^s)\tilde{w}(\theta^s),
-\end{equation}
-where $\theta^s$ denotes all relevant parameters but explicitly a sample $x_{k-1}^s$, and
-\begin{equation}
-\tilde{w}(\theta^s) = \frac{w(\theta^s)}{\sum_{s=1}^S w(\theta^s)}, \quad \text{with} \quad w(\theta^s) = \frac{p( x_{k-1}^s | z_{1:k-1})}{\pi(\theta^s)}.
-\end{equation}
+## Bayesian Network of the Hidden Markov Model (HMM)
 
-It turns out that a proper choice of proposal distribution from which $x_{k-1}$ is easily sampled, significantly simplifies the posterior estimation, as we will now show,
+Using HMM and denoting a time-step as $k$, we will infer the probability of a current true state, denoted $x_k$, conditioned on all previous hidden and (including the current) observed  states, which we denote $x_{1:k-1}$ and $z_{1:k}$ respectively. For HMM, we make the following assumption about any time sequence:
 
-\begin{equation}
-    p(x_{k-1}|z_{1:k-1}) \propto p(z_{\alpha}|x_{\alpha})p(x_{\alpha}|z_{\alpha-1}) = \sum_{s=1}^Sp(z_\alpha|x_\alpha)p(x_\alpha|x_{\alpha-1}^s)\tilde{w}_\alpha(\theta^s),
-\end{equation}
+\begin{eqnarray}
+p(x_k|x_{1:k-1}) &= p(x_k|x_{k-1})\\
+p(z_k|x_{1:k}) &= p(z_k|x_k).
+\end{eqnarray}
 
-where $\alpha = k-1$ and any approximate equalities have been substituted with strict equalities for brevity. Using the above equation and dropping the parameter dependencies for the weights, we find,
+We further assume, that given the current state, the current observation will be independent of all previous observations,
 
 \begin{equation}
-w^s_k = \frac{p( x_{\alpha}^s | z_{1:\alpha})}{\pi(\theta^s)}\propto \frac{p(z_\alpha|x^s_\alpha)\sum_{l=1}^L p(x_\alpha^s|x_{\alpha-1}^l)\tilde{w}_\alpha^l}{\pi(\theta^s)}.
+p(z_{1:k}|x_k) = p(z_k|x_k)p(z_{1:k-1} |x_k).
 \end{equation}
 
-Clearly, weights at subsequent time-steps depend sequentially on immediate previous weights. However, it would perhaps seem computationally disadvantageous to sample $S$ samples, for each we need to calculates probabilities through a sum of previous $L$ samples. To make further simplifications, we turn to particle filtering.
+For completion, we can then write the entire joint probability for a time sequence as follows,
+
+\begin{equation}
+p(x_{1:k},z_{1:k}) = p(x_1) \prod_{i=2}^k p(z_i|x_i)p(x_i|x_{i-1}).
+\end{equation}
+
+However, for predictive purposes, we wish to find the distribution of the current state $x_k$ conditioned on all previous states. Since we assume any hidden state is independent of all previous hidden states, except the immediate previous one, we wish to infer,
+
+\begin{align}
+p(x_k|z_{1:k}) &= \frac{p(z_{1:k}|x_k)p(x_k)}{p(z_{1:k})} \nonumber \\
+&=\frac{p(z_k|x_k)p(z_{1:k-1} |x_k)p(x_k)}{p(z_{1:k})} \nonumber \\
+&=\frac{p(z_k|x_k)p(x_k|z_{1:k-1} )p(z_{1:k-1})}{p(z_{1:k})} \nonumber \\
+&=\frac{p(z_k|x_k)p(x_k|z_{1:k-1} )}{p(z_{k}|z_{1:k-1} )}.
+\end{align}
+
+As we shall see later, we explicitly model $p(z_k|x_k)$, thus leaving us to reformulate $p(x_k|z_{1:k-1} )$ as a marginalization,
+
+\begin{align}
+p(x_k|z_{1:k-1} ) &= \int \frac{p(x_k,x_{k-1},z_{1:k-1} )}{p(z_{1:k})}dx_{k-1} \nonumber \\
+&= \int \frac{p(x_k|x_{k-1})p(z_{1:k-1} | x_{k-1} ) p(x_{k-1})}{p(z_{1:k})}dx_{k-1}\nonumber\\
+&=\int p(x_k|x_{k-1})p( x_{k-1} | z_{1:k-1})dx_{k-1},
+\end{align}
+where we further utilized the following assumption
+
+\begin{equation}
+p(x_k,z_{1:k-1}|x_{k-1}) = p(x_k|x_{k-1})p(z_{1:k-1} | x_{k-1} ).
+\end{equation}
+
+The above equation is typically not possible to solve analytically, and so we turn to sequential Monte Carlo methods.
 
 ## Particle filters
 
-Particle filters rely on the simple concept assigning each weight to a unique particle. We formulate this mathematically as the set of $S$ samples,
+Particle filters formulates the posterior $p(x_k|z_{1:k})$ by approximating it with an average over "particles", which we write (intially as a continuous space) as,
+
+\begin{equation}
+p(x_k|z_{1:k}) \int p(x^i_k|z_{1:k})\delta(x_k-x_k^i)dx_k^i.
+\end{equation}
+
+We then identify the previous equation as an average of $\delta(x_k-x_k^i)$ over the conditional probability density of $x^i_{k}$, hence carrying the cencept of particles. Thus, referring to Chap. 10 (*A. Gelman, J. Carlin, H. Stern, D. Dunson, A. Vehtari, and D. Rubin, Bayesian
+Data Analysis, Third Edition (Chapman & Hall/CRC Texts in Statistical Science)
+(Chapman and Hall/CRC), 3rd edn. (2014).*), we can estimate the aforementioned expected value through importance sampling, as sampling $x^i_{k}$ in its current form is non-trivial. Hence, by denoting a proposal distribution as $\pi(\theta)$, where $\theta$ denotes all relevant parameters associated with the HMM model, we write,
+
+\begin{equation}
+p(x_k|z_{1:k} ) \simeq \sum_{s=1}^S \tilde{w}_{k}(\theta^s)\delta(x_k-x_k^s),
+\end{equation}
+
+where $\theta^s$ denotes all relevant parameters but explicitly a sample $x_{k}^s$, and
+
+\begin{equation}
+\tilde{w}_{k}(\theta^s) = \frac{w_{k}(\theta^s)}{\sum_{s=1}^S w_{k}(\theta^s)}, \quad \text{with} \quad w_{k}(\theta^s) \propto \frac{p( x_{k}^s | z_{1:k})}{\pi(\theta^s)},
+\end{equation}
+
+such that $\sum_s w_k^s = 1$. Hence, particle filters rely on the simple concept assigning each weight to a unique particle. We formulate this mathematically as the set of $S$ samples,
 
 \begin{equation}
     \{x_k^s,\tilde{w}_k^s~|~s = 1,2,\dots,S\}.
 \end{equation}
 
-The fundamental idea is, that for each time step we keep our samples/particles, but update their weights. We formulate this as,
+It turns out that a proper choice of proposal distribution from which $x_{k}$ is easily sampled, significantly simplifies the posterior estimation, as we will now show by first providing the recursive weight update by noticing that,
+
+\begin{align}
+    p(x^s_{k}|z_{1:k}) &\propto p(z_k|x_k^s)\int p(x_k^s|x^s_{k-1})\sum_j w_{k-1}^j\delta(x_{k-1}^s-x_{k-1}^j)dx_{k-1}^s\\
+                       &= p(z_k|x_k^s) p(x_k^s|x^s_{k-1}) \tilde{w}_{k-1}^s
+\end{align}
+
+Using the above equation and dropping the parameter dependencies for the weights, we find the recursive non-normalized weight update, for each particle,
 
 \begin{equation}
-    p(x_k^s|x_\alpha^l) = \begin{cases} p(x_k^s|x_\alpha^s) & s =l \\ 0 & \text{otherwise} \end{cases}.
+w^s_k = \tilde{w}_{k-1}^i\frac{p(z_k|x_k^s) p(x_k^s|x^s_{k-1})}{\pi(\theta^s)}.
 \end{equation}
 
-Consequently, we still draw samples, but the net effect is that each sample is simply updated, and one can keep track of each sample/particle's weights development through a sequence. Armed with the particle formulation, we simplify the weights' update as follows:
-
-\begin{equation}
-w^s_k = \frac{p( x_{\alpha}^s | z_{1:\alpha})}{\pi(\theta^s)} \propto \frac{p(z_\alpha|x^s_\alpha) p(x_\alpha^s|x_{\alpha-1}^s)\tilde{w}_{\alpha}^s}{\pi(\theta^s)}.
-\end{equation}
+Clearly, weights at subsequent time-steps depend sequentially on immediate previous weights. The fundamental idea is, that for each time step we keep our samples/particles, but update their weights. Consequently, we still draw samples, but the net effect is that each sample is simply updated, and one can keep track of each sample/particle's weights development through a sequence. We now return to the before-mentioned "proper" choice of proposal distibution.
 
 By choosing $\pi(\theta^s) = p(x_\alpha^s|x_{\alpha-1}^s)$, we arrive at the bootstrap filter, where each weight is updated as:
 
 \begin{equation}
-w^s_k =p(z_{k-1}|x^s_{k-1})\tilde{w}_{k-1}^s.
+w^s_k =p(z_{k}|x^s_{k})\tilde{w}_{k-1}^s.
 \end{equation}
 
-This formulation completely allows us to ignore the exact form of the original distribution $p(x_{k-1}|z_{1:k-1})$, making the particle an intuitive sampling algorithm. We should note, that the particle filters are highly prone to include weights that negatively influence the distribution. Thus, we keep track of the effective sample size ($S_{eff}$) - see Chap. 10 (*A. Gelman, J. Carlin, H. Stern, D. Dunson, A. Vehtari, and D. Rubin, Bayesian
+This formulation completely allows us to ignore the exact form of the original distribution $p(x_{k-1}|z_{1:k-1})$, making the particle an intuitive sampling algorithm.
+
+This leaves us with formulating the final posterior, which can be approximated in terms of a sum of said particles,
+
+\begin{equation}
+p(x_k|z_{1:k-1} ) = \sum_{s=1}^S w_k^s \delta(x_k-x_k^s),
+\end{equation}
+
+where,
+
+\begin{equation}
+w_k^s = \tilde{w}_{k-1}^sp(z_{k}|x_{k}^s),
+\end{equation}
+
+
+We should note, that the particle filters are highly prone to include weights that negatively influence the distribution. Thus, we keep track of the effective sample size ($S_{eff}$) - see Chap. 10 (*A. Gelman, J. Carlin, H. Stern, D. Dunson, A. Vehtari, and D. Rubin, Bayesian
 Data Analysis, Third Edition (Chapman & Hall/CRC Texts in Statistical Science)
 (Chapman and Hall/CRC), 3rd edn. (2014).*),
 
@@ -208,19 +269,51 @@ We now provide algorithmic steps to calculate and update the particle weights. A
      * Choose a resampling method (we choose a systematic resampling strategy, as we will touch upon in the next sections).
      * Draw $S$ new particles/samples from the sample population according to their weights $\tilde{w}_k^s$.
      * Reset all weights as $\tilde{w}_k^s = 1/S$.
+     
+## Grid-Based Methods
+The grid-based method relies on a different approach where we explicitly approximate the posterior state disitribution as a sum over grid points,
 
-<!--
-This step computes distribution of ROBOT'S state.
+\begin{equation}
+p(x_{1:k-1}|z_{1:k-1}) \approx \sum_{i=1}^{N_g} w^i_{k-1|k-1}\delta(x_{k-1}-x_{k-1}^i),
+\end{equation}
+where $N_g$ is number of grid points and we defined $w^i_{k-1|k-1}=p(x_{k-1}=x_{k-1}^i|z_{1:k})$. Then through Bayes theorem, as treated earlier, we write,
 
-* Compute $p(x_k|z_{1:k-1} )$
-     \begin{equation}
-    p(x_k|z_{1:k-1} ) \simeq \frac{1}{S}\sum_{s=1}^S p(x_k|x_{k-1}^s)\tilde{w}(\theta)^s,
-    \end{equation}
- * Compute $p(x_k|z_{1:k})$,
-     \begin{equation}
-        p(x_k|z_{1:k}) \propto p(z_k|x_k)p(x_k|z_{1:k-1} ).
-    \end{equation}
--->
+\begin{align}
+p(x_k|z_{1:k-1}) &= \int p(x_k|x_{k-1}) \sum_{i=1}^{N_g} w^i_{k-1|k-1}\delta(x_{k-1}-x_{k-1}^i)dx_{k-1},\\
+                 &= \sum_{i=1}^{N_g} p(x_k|x_{k-1}^i) w^i_{k-1|k-1}.
+\end{align}
+
+We then again make the grid approximation, such that,
+
+\begin{equation}
+p(x_{k}|z_{1:k-1}) \approx \sum_{i=1}^{N_g} w^i_{k|k-1}\delta(x_{k-1}-x_{k-1}^i),
+\end{equation}
+
+where,
+
+\begin{equation}
+ w^i_{k|k-1} = p(x_{k}=x_k^i|z_{1:k-1})=\sum_{j=1}^{N_s} p(x_k^i|x_{k-1}^j)w^j_{k-1|k-1}.
+\end{equation}
+
+Considering how the $x_k^i$ represents an entire continuous grid space, the above equation is a further approximation, where $p(x_k^i|x_{k-1}^j)\approx \int_{x\in x^i_{k}}p(x|x_k^j)$, such that the integral in simply evaluated on a grid center.
+
+We then finally write the posterior distribution for a new state space,
+
+\begin{equation}
+p(x_{1:k-1}|z_{1:k-1}) \propto p(z_k|x_k)p(x_k|z_{1:k-1})\approx\sum_{i=1}^{N_g} w^i_{k|k}\delta(x_{k}-x_{k}^i),
+\end{equation}
+
+where (we again center the distribution on the center of a grid),
+
+\begin{equation}
+ w^i_{k|k} = w_{k|k-1}^i \int_{x\in x^i_{k}}p(z_k|x)\approx w_{k|k-1}^i p(z_k|x_k^i).
+\end{equation}
+
+Hence, we find that the grid-based method calculates grid weigths (or grid posteriors) by summing over all transitions probabilities from one grid to all others, then recursively multiply those grid probabilties. In other words, grid posteriors become priors at next time step of the sequence.
+
+Of course summing over all grid points, especially in those cases with a large gridspace, the computational task becomes both time consuming and expensive. One could of course make the grid more course, however it comes at a price - i.e the probability approximation weakens. Hence, we also proposed the particle filter, which may be more preferable.
+
+Thus, we will in our project, implement both sequential Monte Carlo methods.
 
 
 # Simulation
