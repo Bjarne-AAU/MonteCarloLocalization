@@ -76,54 +76,6 @@ or the Maximum A-Posteriori estimate (or the maximum mode)
 
 # Derivation of Sequential Bayes filter
 
-In this section, we will derive and formulate the *Recursive Bayesian Estimation* or Bayes Filter. The purpose is to lay the foundation for the application known as particle filtering. Specifically, we will use the *Sequential Importance Resampling* (SIR). Of those algorithms associated with SIR we utilize the special case known as *Bootstrap filter*. We generalize the notation for the derivation of SIR.
-
-## Bayesian Network of the Hidden Markov Model (HMM)
-
-Using HMM and denoting a time-step as $k$, we will infer the probability of a current true state, denoted $x_k$, conditioned on all previous hidden and (including the current) observed  states, which we denote $x_{1:k-1}$ and $z_{1:k}$ respectively. For HMM, we make the following assumption about any time sequence:
-
-\begin{eqnarray}
-p(x_k|x_{1:k-1}) &= p(x_k|x_{k-1})\\
-p(z_k|x_{1:k}) &= p(z_k|x_k).
-\end{eqnarray}
-
-We further assume, that given the current state, the current observation will be independent of all previous observations,
-
-\begin{equation}
-p(z_{1:k}|x_k) = p(z_k|x_k)p(z_{1:k-1} |x_k).
-\end{equation}
-
-For completion, we can then write the entire joint probability for a time sequence as follows,
-
-\begin{equation}
-p(x_{1:k},z_{1:k}) = p(x_1) \prod_{i=2}^k p(z_i|x_i)p(x_i|x_{i-1}).
-\end{equation}
-
-However, for predictive purposes, we wish to find the distribution of the current state $x_k$ conditioned on all previous states. Since we assume any hidden state is independent of all previous hidden states, except the immediate previous one, we wish to infer,
-
-\begin{align}
-p(x_k|z_{1:k}) &= \frac{p(z_{1:k}|x_k)p(x_k)}{p(z_{1:k})} \nonumber \\
-&=\frac{p(z_k|x_k)p(z_{1:k-1} |x_k)p(x_k)}{p(z_{1:k})} \nonumber \\
-&=\frac{p(z_k|x_k)p(x_k|z_{1:k-1} )p(z_{1:k-1})}{p(z_{1:k})} \nonumber \\
-&=\frac{p(z_k|x_k)p(x_k|z_{1:k-1} )}{p(z_{k}|z_{1:k-1} )}.
-\end{align}
-
-As we shall see later, we explicitly model $p(z_k|x_k)$, thus leaving us to reformulate $p(x_k|z_{1:k-1} )$ as a marginalization,
-
-\begin{align}
-p(x_k|z_{1:k-1} ) &= \int \frac{p(x_k,x_{k-1},z_{1:k-1} )}{p(z_{1:k})}dx_{k-1} \nonumber \\
-&= \int \frac{p(x_k|x_{k-1})p(z_{1:k-1} | x_{k-1} ) p(x_{k-1})}{p(z_{1:k})}dx_{k-1}\nonumber\\
-&=\int p(x_k|x_{k-1})p( x_{k-1} | z_{1:k-1})dx_{k-1},
-\end{align}
-where we further utilized the following assumption
-
-\begin{equation}
-p(x_k,z_{1:k-1}|x_{k-1}) = p(x_k|x_{k-1})p(z_{1:k-1} | x_{k-1} ).
-\end{equation}
-
-
-# Derivation of Sequential Bayes filter
-
 In this section, we will derive and formulate the *Recursive Bayesian Estimation* or Bayes Filter. The purpose is to lay the foundation for the application known as particle filtering and also the grid-based method. Specifically, we will use the *Sequential Importance Resampling* (SIR). Of those algorithms associated with SIR we utilize the special case known as *Bootstrap filter*. We generalize the notation for the derivation of SIR, and refer to a tutorial for particle filters, (*M. S. Arulampalam, S. Maskell, and N. Gordon, A tutorial on particle filters for online
 nonlinear/non-gaussian bayesian tracking. IEEE Transactions on Signal Processing
 174–188 (2002)*), for a more general and detailed derivation than presented here. This section is mainly inspired by said tutorial.
@@ -269,7 +221,7 @@ We now provide algorithmic steps to calculate and update the particle weights. A
      * Choose a resampling method (we choose a systematic resampling strategy, as we will touch upon in the next sections).
      * Draw $S$ new particles/samples from the sample population according to their weights $\tilde{w}_k^s$.
      * Reset all weights as $\tilde{w}_k^s = 1/S$.
-     
+
 ## Grid-Based Methods
 The grid-based method relies on a different approach where we explicitly approximate the posterior state disitribution as a sum over grid points,
 

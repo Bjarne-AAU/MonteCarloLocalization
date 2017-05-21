@@ -72,7 +72,7 @@ win = MainWindow(win_width, win_height, "Monte Carlo Localization - Demo applica
 win.FPS = 30
 win.set_option("seed", map_seed)
 
-vs = (35,35)
+vs = (15,15)
 
 vision = Vision.Sensor(vs)
 motion = Motion.Sensor()
@@ -80,7 +80,7 @@ motion = Motion.Sensor()
 # OPTIONS for noise: GAUSSIAN, SALT, PEPPER, SALT_PEPPER, SPECKLE
 # OPTIONS for model: MDIFF, SQDIFF, CCORR, CCOEFF
 vision_sensor = Vision.Sensor(vs, fps=5)
-vision_sensor_noise = Vision.SensorNoiseModel.SPECKLE(0.5)
+vision_sensor_noise = Vision.SensorNoiseModel.GAUSSIAN(0.5)
 vision_sensor.set_noise_model(vision_sensor_noise)
 vision_model = Vision.ObservationModel.MDIFF
 
@@ -92,7 +92,7 @@ motion_sensor.set_noise_model(motion_sensor_noise)
 motion_model = Motion.ObservationModel.ADVANCED
 
 # REPRESENTATION
-#density = Representation.Grid( (map_width, map_height) )
+# density = Representation.Grid( (map_width, map_height) )
 density = Representation.Particles( 1000, (map_width, map_height) )
 
 
